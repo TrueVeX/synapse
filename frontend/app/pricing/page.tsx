@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import confetti from "canvas-confetti";
-import { ArrowLeft, CheckCircle2, Receipt, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Receipt, Sparkles, X } from "lucide-react";
 import { Pricing, type PricingPlan } from "@/components/ui/pricing";
 import { SynapseMark } from "@/components/chat/synapse-mark";
 import { CreditMeter } from "@/components/chat/credit-meter";
@@ -243,18 +243,20 @@ export default function PricingPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4">
+      {/* Payment messages float at the bottom of the screen so they are seen
+          wherever the plan button was tapped (on phones the plans sit far below the top). */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <AnimatePresence>
           {notice && (
             <motion.div
+              key={notice.text}
               role={notice.kind === "error" ? "alert" : "status"}
-              initial={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              exit={{ opacity: 0, y: 16 }}
               className={
-                notice.kind === "error"
-                  ? "mt-6 flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-                  : "mt-6 flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-card-foreground"
+                "pointer-events-auto flex w-full max-w-lg items-start gap-2 rounded-xl border bg-popover px-4 py-3 text-sm shadow-lg " +
+                (notice.kind === "error" ? "border-destructive/40 text-destructive" : "border-primary/40 text-card-foreground")
               }
             >
               {notice.kind === "success" && <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />}
@@ -264,9 +266,20 @@ export default function PricingPage() {
                   Start researching
                 </Link>
               )}
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                aria-label="Dismiss message"
+                className="-my-1 -mr-2 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4">
 
         {status && (
           <section className="mt-8 rounded-2xl border border-border bg-card p-5 sm:p-6">
