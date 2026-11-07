@@ -10,6 +10,8 @@ const serif = Source_Serif_4({ subsets: ["latin"], variable: "--font-source-seri
 export const metadata: Metadata = {
   title: "SYNAPSE — AI Research",
   description: "A focused AI research workspace",
+  // Google Search Console ownership check.
+  verification: { google: "7g5JZI04aYb2aEU2x2Tzd5oRYhu4O_zGuJpKiL6gwS8" },
 };
 
 // Phones: fill the screen edge to edge (notches handled with safe-area padding)

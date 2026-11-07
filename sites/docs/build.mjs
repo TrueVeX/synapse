@@ -156,6 +156,7 @@ function layout({ page, pages, sidebar, prev, next }) {
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}" />
 <meta name="theme-color" content="#1f1e1d" />
+<meta name="google-site-verification" content="7g5JZI04aYb2aEU2x2Tzd5oRYhu4O_zGuJpKiL6gwS8" />
 <link rel="canonical" href="${SITE.url}${urlFor(slug)}" />
 <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/assets/apple-icon.png" />
