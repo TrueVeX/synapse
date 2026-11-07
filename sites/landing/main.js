@@ -15,19 +15,26 @@
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
+  var onMenuChange = function () {};
   function closeMenu() {
     links.classList.remove("is-open");
     menuButton.setAttribute("aria-expanded", "false");
     menuButton.setAttribute("aria-label", "Open menu");
+    onMenuChange();
   }
   menuButton.addEventListener("click", function () {
     var open = !links.classList.contains("is-open");
     links.classList.toggle("is-open", open);
     menuButton.setAttribute("aria-expanded", String(open));
     menuButton.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    onMenuChange();
   });
   links.addEventListener("click", function (event) {
     if (event.target.closest("a")) closeMenu();
+  });
+  // Tapping anywhere outside the open menu closes it.
+  document.addEventListener("click", function (event) {
+    if (links.classList.contains("is-open") && !event.target.closest(".nav")) closeMenu();
   });
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") closeMenu();
@@ -174,6 +181,50 @@
   var card = document.querySelector('.dl[data-platform="' + platform + '"]');
   if (card) card.classList.add("is-recommended");
 
+  /* ---------------- Phones: floating download bar ---------------- */
+  var cta = document.querySelector(".mobile-cta");
+  if (cta) {
+    var ctaTitle = cta.querySelector("[data-cta-title]");
+    var ctaSub = cta.querySelector("[data-cta-sub]");
+    var ctaLink = cta.querySelector("[data-cta-link]");
+    if (platform === "android") {
+      ctaTitle.textContent = "SYNAPSE for Android";
+      ctaSub.textContent = "Free · " + ((document.querySelector("[data-apk-size]") || {}).textContent || "small download") + " · Android 7.0+";
+      ctaLink.textContent = "Get the app";
+      ctaLink.setAttribute("href", "#download");
+    } else if (platform === "windows") {
+      ctaTitle.textContent = "SYNAPSE for Windows";
+      ctaSub.textContent = "Free · Windows 10 and 11";
+      ctaLink.textContent = "Download";
+      ctaLink.setAttribute("href", "#download");
+    }
+
+    var heroEl = document.querySelector(".hero");
+    var hideZones = [document.getElementById("download"), document.querySelector(".footer")].filter(Boolean);
+    var pastHero = false;
+    var inHideZone = false;
+    var updateCta = function () {
+      var menuOpen = links.classList.contains("is-open");
+      cta.classList.toggle("is-shown", pastHero && !inHideZone && !menuOpen);
+    };
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        pastHero = !entries[0].isIntersecting && entries[0].boundingClientRect.top < 0;
+        updateCta();
+      }).observe(heroEl);
+      var visibleZones = new Set();
+      var zoneObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) visibleZones.add(entry.target); else visibleZones.delete(entry.target);
+        });
+        inHideZone = visibleZones.size > 0;
+        updateCta();
+      }, { rootMargin: "0px 0px -10% 0px" });
+      hideZones.forEach(function (zone) { zoneObserver.observe(zone); });
+      onMenuChange = updateCta;
+    }
+  }
+
   /* ---------------- Copy checksums ---------------- */
   document.querySelectorAll(".copy").forEach(function (button) {
     button.addEventListener("click", function () {
@@ -205,6 +256,13 @@
   var canvas = document.getElementById("hero-canvas");
   if (!stage || !canvas || !canvas.getContext) return;
   var ctx = canvas.getContext("2d");
+
+  // Touch screens: swipe instead of drag, and a lighter frame rate to save battery.
+  var coarse = window.matchMedia("(pointer: coarse)").matches;
+  var hint = document.querySelector(".hero__hint");
+  if (coarse && hint) hint.lastChild.textContent = " Swipe to explore";
+  var frameGap = coarse ? 1000 / 30 : 0;
+  var lastFrame = 0;
 
   var COLORS = { warm: [217, 119, 87], violet: [156, 135, 245], light: [250, 249, 245] };
   var nodes = [];
@@ -346,8 +404,13 @@
     }
   }
 
-  function step() {
+  function step(now) {
     if (!running) return;
+    if (frameGap && now - lastFrame < frameGap) {
+      requestAnimationFrame(step);
+      return;
+    }
+    lastFrame = now;
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       n.x += n.vx; n.y += n.vy; n.z += n.vz;

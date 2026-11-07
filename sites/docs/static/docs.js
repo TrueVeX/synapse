@@ -20,12 +20,35 @@
   function setMenu(open) {
     if (!menu || !sidebar) return;
     sidebar.classList.toggle("is-open", open);
+    root.classList.toggle("nav-open", open);
     menu.setAttribute("aria-expanded", String(open));
     menu.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
     if (scrim) scrim.hidden = !open;
   }
   if (menu) menu.addEventListener("click", function () { setMenu(!sidebar.classList.contains("is-open")); });
   if (scrim) scrim.addEventListener("click", function () { setMenu(false); });
+  // Rotating a tablet or widening the window past the drawer layout closes it.
+  window.matchMedia("(min-width: 901px)").addEventListener("change", function (event) { if (event.matches) setMenu(false); });
+
+  /* "On this page" dropdown: close after choosing a section */
+  var tocMobile = document.querySelector(".toc-mobile");
+  if (tocMobile) {
+    tocMobile.addEventListener("click", function (event) {
+      if (event.target.closest("a")) tocMobile.open = false;
+    });
+  }
+
+  /* Back to top: appears after scrolling down a long page */
+  var toTop = document.querySelector(".to-top");
+  if (toTop) {
+    var onScroll = function () { toTop.hidden = window.scrollY < 900; };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    toTop.addEventListener("click", function (event) {
+      event.preventDefault();
+      window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    });
+  }
   var current = sidebar && sidebar.querySelector('[aria-current="page"]');
   if (current) current.scrollIntoView({ block: "center" });
 

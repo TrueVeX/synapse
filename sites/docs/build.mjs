@@ -138,6 +138,12 @@ function layout({ page, pages, sidebar, prev, next }) {
         .map((item) => `<li class="toc__item toc__item--${item.depth}"><a href="#${item.id}">${escapeHtml(item.text)}</a></li>`)
         .join("")}</ul></nav>`
     : "";
+  // Phones and tablets: the same contents as a dropdown at the top of the page.
+  const tocMobile = toc.length > 2
+    ? `<details class="toc-mobile"><summary>On this page</summary><ul>${toc
+        .map((item) => `<li class="toc__item--${item.depth}"><a href="#${item.id}">${escapeHtml(item.text)}</a></li>`)
+        .join("")}</ul></details>`
+    : "";
   const pager = `<nav class="pager" aria-label="Previous and next pages">${
     prev ? `<a class="pager__link" href="${urlFor(prev.slug)}"><span>Previous</span><strong>${escapeHtml(prev.meta.title)}</strong></a>` : "<span></span>"
   }${next ? `<a class="pager__link pager__link--next" href="${urlFor(next.slug)}"><span>Next</span><strong>${escapeHtml(next.meta.title)}</strong></a>` : ""}</nav>`;
@@ -189,6 +195,7 @@ function layout({ page, pages, sidebar, prev, next }) {
       <p class="crumb">${escapeHtml(page.section)}</p>
       <h1 class="doc__title">${escapeHtml(meta.title)}</h1>
       ${meta.description ? `<p class="doc__lede">${escapeHtml(meta.description)}</p>` : ""}
+      ${tocMobile}
       <div class="doc__body">
 ${html}
       </div>
@@ -202,6 +209,7 @@ ${html}
   </main>
   ${tocHtml ? `<aside class="toc-wrap">${tocHtml}</aside>` : ""}
 </div>
+<a class="to-top" href="#content" aria-label="Back to top" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
 <div class="search" hidden role="dialog" aria-modal="true" aria-label="Search the docs">
   <div class="search__panel">
     <div class="search__field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input type="search" placeholder="Search the documentation" aria-label="Search" autocomplete="off" /><button type="button" class="search__close" aria-label="Close search">Esc</button></div>
