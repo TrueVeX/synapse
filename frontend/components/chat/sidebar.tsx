@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
   LogOut,
@@ -8,14 +9,17 @@ import {
   MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  CreditCard,
+  Sparkles,
   Pencil,
   Plus,
   Trash2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Conversation, User } from "@/lib/api";
+import type { BillingStatus, Conversation, User } from "@/lib/api";
 import { SynapseMark } from "./synapse-mark";
+import { CreditMeter } from "./credit-meter";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
@@ -272,6 +276,7 @@ type SidebarProps = {
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSignOut: () => void;
+  billing: BillingStatus | null;
 };
 
 function RailButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
@@ -326,12 +331,23 @@ function SidebarPanel({
           <MessagesSquare className="size-[18px]" />
         </RailButton>
         <div className="flex-1" />
+        <Link
+          href="/pricing"
+          title="Plans and credits"
+          aria-label="Plans and credits"
+          className="mb-1 grid size-9 place-items-center rounded-lg text-primary transition-colors hover:bg-sidebar-accent"
+        >
+          <Sparkles className="size-[18px]" />
+        </Link>
         <div ref={userMenuRef} className="relative">
           <button type="button" onClick={() => setUserMenuOpen((value) => !value)} aria-label="Account menu">
             {avatar}
           </button>
           <Popover open={userMenuOpen} className="bottom-11 left-0 origin-bottom-left">
             <div className="px-2.5 py-2 text-xs text-muted-foreground">{user.email}</div>
+            <Link href="/pricing" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
+              <CreditCard className="size-4" /> Plans &amp; billing
+            </Link>
             <MenuItem icon={<LogOut className="size-4" />} onClick={props.onSignOut}>
               Sign out
             </MenuItem>
@@ -402,6 +418,26 @@ function SidebarPanel({
         )}
       </nav>
 
+      {props.billing && (
+        <div className="mx-2 mb-2 rounded-xl border border-border bg-background/40 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-card-foreground">
+              {props.billing.plan !== "free" && <Sparkles className="size-3.5 text-primary" />}
+              {props.billing.plan_name} plan
+            </span>
+            {props.billing.plan !== "max" && (
+              <Link
+                href="/pricing"
+                className="rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Upgrade
+              </Link>
+            )}
+          </div>
+          <CreditMeter credits={props.billing.credits} compact />
+        </div>
+      )}
+
       <div ref={userMenuRef} className="relative border-t border-border p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
@@ -416,7 +452,13 @@ function SidebarPanel({
           </span>
         </button>
         <Popover open={userMenuOpen} className="bottom-14 left-2 right-2 origin-bottom">
-          <MenuItem icon={<LogOut className="size-4" />} onClick={props.onSignOut}>
+          <div className="px-2.5 py-2 text-xs text-muted-foreground">
+            {props.billing ? `${props.billing.plan_name} plan` : "Account"}
+          </div>
+          <Link href="/pricing" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
+              <CreditCard className="size-4" /> Plans &amp; billing
+            </Link>
+            <MenuItem icon={<LogOut className="size-4" />} onClick={props.onSignOut}>
             Sign out
           </MenuItem>
         </Popover>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDown, FileSearch, GraduationCap, Menu, Scale, Search, SquarePen } from "lucide-react";
+import { ArrowDown, FileSearch, GraduationCap, Menu, Scale, Search, Sparkles, SquarePen } from "lucide-react";
 import ClaudeChatInput, { type ChatInputSubmit, type Model } from "@/components/ui/claude-style-chat-input";
 import {
   ApiError,
@@ -11,7 +12,9 @@ import {
   clearToken,
   getToken,
   isAuthError,
+  needsUpgrade,
   streamChat,
+  type BillingStatus,
   type Conversation,
   type StoredMessage,
   type StreamEvent,
@@ -21,15 +24,22 @@ import { cn } from "@/lib/utils";
 import { AssistantMessage, ConversationSkeleton, UserMessage, type UIMessage } from "./messages";
 import { Sidebar } from "./sidebar";
 import { SynapseMark } from "./synapse-mark";
+import { resetLabel } from "./credit-meter";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
-// The selector's ids are sent to the backend as `mode`.
-const RESEARCH_MODES: Model[] = [
-  { id: "web", name: "Web research", description: "Fast answer with live web sources" },
-  { id: "academic", name: "Academic", description: "Formal, evidence-focused explanation" },
-  { id: "deep", name: "Deep research", description: "Detailed investigation, advanced search" },
-];
+// The selector's ids are sent to the backend as `mode`. Descriptions show the credit cost.
+function researchModes(billing: BillingStatus | null): Model[] {
+  const costs = billing?.costs ?? { web: 1, academic: 1, deep: 3 };
+  const credits = (n: number) => `${n} credit${n === 1 ? "" : "s"}`;
+  return [
+    { id: "web", name: "Web research", description: `Fast answer with live web sources · ${credits(costs.web)}` },
+    { id: "academic", name: "Academic", description: `Formal, evidence-focused explanation · ${credits(costs.academic)}` },
+    billing && !billing.deep_research
+      ? { id: "deep", name: "Deep research", description: "Detailed investigation · Pro and Max", badge: "Pro" }
+      : { id: "deep", name: "Deep research", description: `Detailed investigation, advanced search · ${credits(costs.deep ?? 3)}` },
+  ];
+}
 
 const ACCEPTED_FILES = ".png,.jpg,.jpeg,.webp,.gif,.pdf,.docx,.txt,.md,.csv,.json";
 
@@ -170,6 +180,7 @@ export default function ChatApp() {
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>();
   const [openSuggestion, setOpenSuggestion] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [showJump, setShowJump] = useState(false);
 
   const activeIdRef = useRef<string | null>(null);
@@ -213,6 +224,8 @@ export default function ChatApp() {
       else setBootError(error instanceof Error ? error.message : "Could not reach the backend.");
       return;
     }
+
+    api<BillingStatus>("/api/billing/status").then(setBilling).catch(() => {});
 
     try {
       const list = await api<{ conversations: Conversation[] }>("/api/conversations");
@@ -400,6 +413,10 @@ export default function ChatApp() {
         switch (event.type) {
           case "meta": {
             streamConversationId = event.conversation_id;
+            if (event.credits) {
+              const credits = event.credits;
+              setBilling((current) => (current ? { ...current, credits } : current));
+            }
             if (!activeIdRef.current) {
               activeIdRef.current = event.conversation_id;
               setActiveId(event.conversation_id);
@@ -472,13 +489,21 @@ export default function ChatApp() {
         } else if (isAuthError(error)) {
           signOut();
         } else {
-          update((m) => ({ ...m, status: "error", error: error instanceof Error ? error.message : "Something went wrong." }));
+          update((m) => ({
+            ...m,
+            status: "error",
+            error: error instanceof Error ? error.message : "Something went wrong.",
+            upgrade: needsUpgrade(error),
+            search: needsUpgrade(error) ? undefined : m.search,
+          }));
         }
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
         if (requestIdRef.current === requestId) requestIdRef.current = null;
         streamingRef.current = false;
         setIsStreaming(false);
+        // Credits may have been refunded (stopped / failed answers).
+        api<BillingStatus>("/api/billing/status").then(setBilling).catch(() => {});
         if (streamConversationId) {
           const id = streamConversationId;
           const stamp = new Date().toISOString();
@@ -588,6 +613,7 @@ export default function ChatApp() {
   );
 
   const activeTitle = conversations.find((item) => item.id === activeId)?.title;
+  const modes = useMemo(() => researchModes(billing), [billing]);
 
   useEffect(() => {
     document.title = activeTitle ? `${activeTitle} — SYNAPSE` : "SYNAPSE — AI Research";
@@ -598,12 +624,36 @@ export default function ChatApp() {
 
   const firstName = user.name.trim().split(/\s+/)[0] || "there";
   const suggestion = SUGGESTIONS.find((item) => item.label === openSuggestion);
+  const credits = billing?.credits;
+  const lowCredits = credits && credits.remaining <= Math.max(2, Math.floor(credits.limit * 0.2));
+
+  // Shown above the input box when credits are running low (like Claude's usage notice).
+  const creditNotice = lowCredits && credits && (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/70 px-3.5 py-2 text-xs text-muted-foreground"
+      role="status"
+    >
+      <span>
+        <span className={credits.remaining === 0 ? "font-medium text-destructive" : "font-medium text-card-foreground"}>
+          {credits.remaining === 0 ? "You're out of credits" : `${credits.remaining} credit${credits.remaining === 1 ? "" : "s"} left`}
+        </span>{" "}
+        · {resetLabel(credits)}
+      </span>
+      {billing?.plan !== "max" && (
+        <Link href="/pricing" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+          <Sparkles className="size-3.5" /> Upgrade
+        </Link>
+      )}
+    </motion.div>
+  );
 
   const composer = (position: "center" | "bottom") => (
     <motion.div layoutId="synapse-composer" transition={{ type: "spring", stiffness: 260, damping: 32 }} className="w-full">
       <ClaudeChatInput
         className="max-w-3xl"
-        models={RESEARCH_MODES}
+        models={modes}
         defaultModel="web"
         placeholder={position === "center" ? "What would you like to research today?" : "Reply to SYNAPSE..."}
         accept={ACCEPTED_FILES}
@@ -631,6 +681,7 @@ export default function ChatApp() {
         onRename={renameConversation}
         onDelete={deleteConversation}
         onSignOut={signOut}
+        billing={billing}
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
@@ -713,7 +764,10 @@ export default function ChatApp() {
               </AnimatePresence>
             </div>
             <div className="shrink-0 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-3 md:px-6">
-              <div className="mx-auto w-full max-w-3xl">{composer("bottom")}</div>
+              <div className="mx-auto w-full max-w-3xl">
+                {creditNotice}
+                {composer("bottom")}
+              </div>
             </div>
           </>
         ) : (
@@ -731,6 +785,7 @@ export default function ChatApp() {
                 </h1>
               </motion.div>
 
+              {creditNotice}
               {composer("center")}
 
               <motion.div
@@ -787,7 +842,7 @@ export default function ChatApp() {
               </div>
             </div>
             <p className="pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 text-center text-xs text-muted-foreground">
-              SYNAPSE · Created by <span className="text-foreground">Revoori Ashwath Reddy</span>
+              SYNAPSE · Created by <span className="text-foreground">Revoori Ashwath Reddy</span> · <span className="text-foreground">HumanForm Studios</span>
             </p>
           </div>
         )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
@@ -12,6 +13,7 @@ import {
   ImageIcon,
   Lightbulb,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { ShiningText } from "@/components/ui/shining-text";
 import { cn } from "@/lib/utils";
@@ -39,6 +41,8 @@ export type UIMessage = {
   thinkingSeconds?: number;
   status: "pending" | "streaming" | "done" | "error" | "stopped";
   error?: string;
+  /** The error is a plan limit: show a link to the pricing page. */
+  upgrade?: boolean;
   /** Streamed in this session: reveal smoothly. Loaded history appears at once. */
   animate?: boolean;
 };
@@ -273,7 +277,15 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry }: Assista
       {message.status === "error" && (
         <div className="mt-3 flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-sm text-destructive" role="alert">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{message.error || "Something went wrong."}</span>
+          <span className="flex-1">{message.error || "Something went wrong."}</span>
+          {message.upgrade && (
+            <Link
+              href="/pricing"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              <Sparkles className="size-3.5" /> View plans
+            </Link>
+          )}
         </div>
       )}
 

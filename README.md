@@ -1,6 +1,6 @@
 # SYNAPSE
 
-**Created by Revoori Ashwath Reddy**
+**Created by Revoori Ashwath Reddy · HumanForm Studios**
 
 SYNAPSE is an AI research assistant. Ask a question and it searches the web, reads any files you attach, and streams back a cited answer in a chat interface.
 
@@ -90,6 +90,15 @@ The repository is ready to deploy as **two Vercel projects**: one with root dire
 
 On Vercel the backend refuses to start without `DATABASE_URL` or with a weak `JWT_SECRET`. Vercel limits each request to about 4.5 MB of uploads and 300 seconds.
 
+## Windows and Android apps
+
+The apps in `apps/` open the deployed SYNAPSE website, so they always show the latest version. First set your website address in `apps/app.config.json` (`"url": "https://your-site.vercel.app"`); until then the apps show a "not connected yet" screen.
+
+- **Windows (.exe):** `cd apps/desktop`, `npm install`, `npm run dist`. The installer and a portable `.exe` appear in `apps/desktop/dist/`.
+- **Android (.apk):** needs Android Studio. `cd apps/mobile`, `npm install`, `npm run sync`, then in `apps/mobile/android` run `gradlew.bat assembleDebug` (with `JAVA_HOME` set to Android Studio's `jbr` folder). The APK appears in `android/app/build/outputs/apk/debug/`.
+
+Google blocks its sign-in inside app windows, so the apps offer email and password sign-in; "Continue with Google" works on the website.
+
 ## Keeping your keys private
 
 API keys are **never** stored in this repository. They live only in `backend/.env` (and `frontend/.env.local`), which are listed in `.gitignore`, and in your hosting provider's environment settings. Only the `.env.example` templates, with empty values, are committed. If a key is ever exposed, revoke it in the provider's dashboard and create a new one.
@@ -126,4 +135,4 @@ SYNAPSE is built on these services and open-source projects. Thank you to their 
 
 ## License
 
-All rights reserved by Revoori Ashwath Reddy unless a license file is added.
+© HumanForm Studios. All rights reserved by Revoori Ashwath Reddy and HumanForm Studios unless a license file is added.

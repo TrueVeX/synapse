@@ -368,3 +368,79 @@
 .hljs-deletion { color: #ef6b6b; }
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 700; }
+
+/* ===== Sign-in / sign-up card (21st.dev): radius scale and elevated shadows ===== */
+@theme inline {
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --shadow-elevated-2xs: var(--elevated-2xs);
+  --shadow-elevated-xs: var(--elevated-xs);
+  --shadow-elevated-sm: var(--elevated-sm);
+  --shadow-elevated-md: var(--elevated-md);
+  --shadow-elevated-lg: var(--elevated-lg);
+  --shadow-elevated-xl: var(--elevated-xl);
+  --shadow-elevated-2xl: var(--elevated-2xl);
+}
+
+:root {
+  --elevated-2xs: 0 0 0 1px rgb(41 41 41 / 0.04), inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+  --elevated-xs: 0 1px 1px 0.5px rgb(41 41 41 / 0.04), 0 3px 3px -1.5px rgb(41 41 41 / 0.02),
+    0 0 0 1px rgb(41 41 41 / 0.04), inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+  --elevated-sm: 0 1px 1px 0.5px rgb(41 41 41 / 0.04), 0 3px 3px -1.5px rgb(41 41 41 / 0.02),
+    0 6px 6px -3px rgb(41 41 41 / 0.04), 0 0 0 1px rgb(41 41 41 / 0.04),
+    inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+  --elevated-md: 0 1px 1px 0.5px rgb(41 41 41 / 0.04), 0 3px 3px -1.5px rgb(41 41 41 / 0.02),
+    0 6px 6px -3px rgb(41 41 41 / 0.04), 0 12px 12px -6px rgb(41 41 41 / 0.04),
+    0 0 0 1px rgb(41 41 41 / 0.04), inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+  --elevated-lg: 0 1px 1px 0.5px rgb(41 41 41 / 0.04), 0 3px 3px -1.5px rgb(41 41 41 / 0.02),
+    0 6px 6px -3px rgb(41 41 41 / 0.04), 0 12px 12px -6px rgb(41 41 41 / 0.04),
+    0 24px 24px -12px rgb(41 41 41 / 0.04), 0 0 0 1px rgb(41 41 41 / 0.04),
+    inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+  --elevated-xl: 0 1px 1px 0.5px rgb(41 41 41 / 0.04), 0 3px 3px -1.5px rgb(41 41 41 / 0.02),
+    0 6px 6px -3px rgb(41 41 41 / 0.04), 0 12px 12px -6px rgb(41 41 41 / 0.04),
+    0 24px 24px -12px rgb(41 41 41 / 0.04),
+    0 48px 48px -24px rgb(41 41 41 / 0.04), 0 0 0 1px rgb(41 41 41 / 0.04),
+    inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+  --elevated-2xl: 0 1px 1px 0.5px rgb(41 41 41 / 0.04), 0 3px 3px -1.5px rgb(41 41 41 / 0.02),
+    0 6px 6px -3px rgb(41 41 41 / 0.04), 0 12px 12px -6px rgb(41 41 41 / 0.04),
+    0 24px 24px -12px rgb(41 41 41 / 0.04),
+    0 48px 48px -24px rgb(41 41 41 / 0.04),
+    0 96px 96px -48px rgb(41 41 41 / 0.04), 0 0 0 1px rgb(41 41 41 / 0.04),
+    inset 0 -1px 1px -0.5px rgb(51 51 51 / 0.06);
+}
+
+.dark {
+  --elevated-2xs: 0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+  --elevated-xs: 0 1px 1px 0.5px rgb(0 0 0 / 0.04), 0 3px 3px -1.5px rgb(0 0 0 / 0.02),
+    0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+  --elevated-sm: 0 1px 1px 0.5px rgb(0 0 0 / 0.04), 0 3px 3px -1.5px rgb(0 0 0 / 0.02),
+    0 6px 6px -3px rgb(0 0 0 / 0.04),
+    0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+  --elevated-md: 0 1px 1px 0.5px rgb(0 0 0 / 0.04), 0 3px 3px -1.5px rgb(0 0 0 / 0.02),
+    0 6px 6px -3px rgb(0 0 0 / 0.04), 0 12px 12px -6px rgb(0 0 0 / 0.04),
+    0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+  --elevated-lg: 0 1px 1px 0.5px rgb(0 0 0 / 0.04), 0 3px 3px -1.5px rgb(0 0 0 / 0.02),
+    0 6px 6px -3px rgb(0 0 0 / 0.04), 0 12px 12px -6px rgb(0 0 0 / 0.04),
+    0 24px 24px -12px rgb(0 0 0 / 0.04),
+    0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+  --elevated-xl: 0 1px 1px 0.5px rgb(0 0 0 / 0.04), 0 3px 3px -1.5px rgb(0 0 0 / 0.02),
+    0 6px 6px -3px rgb(0 0 0 / 0.04), 0 12px 12px -6px rgb(0 0 0 / 0.04),
+    0 24px 24px -12px rgb(0 0 0 / 0.04), 0 48px 48px -24px rgb(0 0 0 / 0.04),
+    0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+  --elevated-2xl: 0 1px 1px 0.5px rgb(0 0 0 / 0.04), 0 3px 3px -1.5px rgb(0 0 0 / 0.02),
+    0 6px 6px -3px rgb(0 0 0 / 0.04), 0 12px 12px -6px rgb(0 0 0 / 0.04),
+    0 24px 24px -12px rgb(0 0 0 / 0.04), 0 48px 48px -24px rgb(0 0 0 / 0.04),
+    0 96px 96px -48px rgb(0 0 0 / 0.04),
+    0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
+    inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
+}

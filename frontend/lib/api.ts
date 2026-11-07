@@ -19,7 +19,7 @@ export type StoredMessage = {
 
 // Events sent by POST /api/chat/stream, one JSON object per line.
 export type StreamEvent =
-  | { type: "meta"; conversation_id: string; title: string; request_id: string }
+  | { type: "meta"; conversation_id: string; title: string; request_id: string; credits?: CreditInfo }
   | { type: "status"; stage: "searching" | "thinking"; query?: string }
   | { type: "sources"; sources: Source[]; error: string | null; enabled: boolean; query?: string }
   | { type: "thinking"; text: string }
@@ -28,13 +28,62 @@ export type StreamEvent =
   | { type: "stopped" }
   | { type: "error"; message: string };
 
+export type CreditInfo = {
+  used: number;
+  limit: number;
+  remaining: number;
+  window: "day" | "month";
+  resets_at: string;
+};
+
+export type BillingStatus = {
+  plan: "free" | "pro" | "max";
+  plan_name: string;
+  billing: "monthly" | "annual" | null;
+  expires_at: string | null;
+  credits: CreditInfo;
+  costs: { web: number; academic: number; deep: number | null };
+  deep_research: boolean;
+  max_files: number;
+};
+
+export type PlanInfo = {
+  id: "free" | "pro" | "max";
+  name: string;
+  credits: number;
+  window: "day" | "month";
+  deep_cost: number | null;
+  max_files: number;
+  monthly_price: number;
+  annual_price: number;
+  features: string[];
+  description: string;
+};
+
+export type PlansResponse = {
+  currency: "INR";
+  payments_enabled: boolean;
+  annual_discount_percent: number;
+  plans: PlanInfo[];
+};
+
+/** Billing error codes sent by the backend with 402/403 responses. */
+export const UPGRADE_CODES = ["out_of_credits", "upgrade_required", "too_many_files"];
+
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
+}
+
+/** True when the fix is a bigger plan (out of credits, Pro-only feature...). */
+export function needsUpgrade(error: unknown) {
+  return error instanceof ApiError && !!error.code && UPGRADE_CODES.includes(error.code);
 }
 
 export function getToken(): string | null {
@@ -60,6 +109,8 @@ export function isAuthError(error: unknown) {
 
 function detailToMessage(detail: unknown): string | null {
   if (typeof detail === "string") return detail;
+  // Billing errors: { code, message }
+  if (detail && typeof detail === "object" && "message" in detail) return String(detail.message);
   // FastAPI validation errors (422) arrive as a list of { msg } objects.
   if (Array.isArray(detail)) {
     return detail
@@ -71,13 +122,15 @@ function detailToMessage(detail: unknown): string | null {
 
 async function toApiError(response: Response) {
   let message = `Request failed (${response.status}).`;
+  let code: string | undefined;
   try {
     const data = await response.json();
     message = detailToMessage(data?.detail) ?? message;
+    if (data?.detail && typeof data.detail === "object" && "code" in data.detail) code = String(data.detail.code);
   } catch {
     /* not JSON */
   }
-  return new ApiError(message, response.status);
+  return new ApiError(message, response.status, code);
 }
 
 function networkError() {

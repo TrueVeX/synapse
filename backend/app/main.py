@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import json
+import secrets
 import os
 import sqlite3
 import threading
@@ -23,6 +26,7 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Request,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -172,6 +176,7 @@ class QueryResult:
         self._cursor = cursor
         self._first_row = first_row
         self.lastrowid = lastrowid
+        self.rowcount = cursor.rowcount
 
     def fetchone(self):
         if self._first_row is not None:
@@ -309,6 +314,46 @@ def initialize_database():
             """
             CREATE INDEX IF NOT EXISTS idx_messages_conversation
             ON messages (conversation_id, id)
+            """
+        )
+        # Plans, payments and credit usage (section 14c).
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                user_id INTEGER PRIMARY KEY,
+                plan TEXT NOT NULL,
+                billing TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                last_order_id TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS payments (
+                order_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                plan TEXT NOT NULL,
+                billing TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                currency TEXT NOT NULL,
+                status TEXT NOT NULL,
+                payment_id TEXT,
+                created_at TEXT NOT NULL,
+                paid_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS credit_usage (
+                user_id INTEGER NOT NULL,
+                window_key TEXT NOT NULL,
+                used INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (user_id, window_key)
+            )
             """
         )
         # Stop requests, so Stop works even when it reaches a different
@@ -581,6 +626,87 @@ def login_user(payload: LoginRequest):
 # FIXES THE /api/auth/me 404 ERROR
 # ============================================================
 
+# ============================================================
+# 9b. SIGN IN WITH GOOGLE
+# The browser gets an access token from Google's sign-in popup; we ask
+# Google whether it is genuine AND was issued to our own client ID.
+# ============================================================
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+
+
+class GoogleLoginRequest(BaseModel):
+    access_token: str = Field(min_length=10, max_length=4096)
+
+
+@app.post("/api/auth/google")
+def login_with_google(payload: GoogleLoginRequest):
+
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=503,
+            detail="Google sign-in is not set up yet. Use email and password for now.",
+        )
+
+    try:
+        info = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"access_token": payload.access_token},
+            timeout=15,
+        )
+        profile = requests.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {payload.access_token}"},
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Could not reach Google. Please try again.") from exc
+
+    if not info.ok or not profile.ok:
+        raise HTTPException(status_code=401, detail="Google sign-in failed. Please try again.")
+
+    token = info.json()
+    person = profile.json()
+
+    # A token made for a different app must not log anyone in here.
+    if token.get("aud") != GOOGLE_CLIENT_ID and token.get("azp") != GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=401, detail="This Google sign-in was not made for SYNAPSE.")
+
+    email = str(person.get("email") or token.get("email") or "").lower().strip()
+    verified = person.get("email_verified") in (True, "true") or token.get("email_verified") in (True, "true")
+
+    if not email or not verified:
+        raise HTTPException(status_code=401, detail="Your Google account's email address is not verified.")
+
+    user = find_user_by_email(email)
+
+    if not user:
+        name = (str(person.get("name") or "").strip() or email.split("@")[0])[:100]
+        # Google accounts get a random password nobody knows; they sign in with Google.
+        password_hash = pwd_context.hash(secrets.token_urlsafe(32))
+
+        try:
+            with get_connection() as connection:
+                connection.execute(
+                    """
+                    INSERT INTO users (name, email, password_hash, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (name, email, password_hash, datetime.now(timezone.utc).isoformat()),
+                )
+        except duplicate_key_errors():
+            pass  # created a moment ago by a parallel request
+
+        user = find_user_by_email(email)
+
+    return {
+        "message": "Login successful.",
+        "access_token": create_access_token(email),
+        "token_type": "bearer",
+        "user": public_user(user),
+    }
+
+
 @app.get("/api/auth/me")
 def get_current_user(
     authorization: Optional[str] = Header(default=None),
@@ -716,10 +842,11 @@ def search_web(query: str, mode: str):
 SYSTEM_PROMPT = (
     "You are SYNAPSE, an accurate AI research "
     "assistant. Never fabricate citations. "
-    "SYNAPSE was built by Revoori Ashwath Reddy. Whenever someone asks "
+    "SYNAPSE was built by Revoori Ashwath Reddy at HumanForm Studios. "
+    "Whenever someone asks "
     "who built, made, created, developed or owns you (or SYNAPSE), or "
     "asks about your developer or creator, answer directly that you were "
-    "built by Revoori Ashwath Reddy. Do not use web search results or "
+    "built by Revoori Ashwath Reddy at HumanForm Studios. Do not use web search results or "
     "citation markers for that answer."
 )
 
@@ -1011,8 +1138,10 @@ async def research(
     mode: str = Form("web"),
     prompt: str = Form(""),
     files: Optional[list[UploadFile]] = File(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
 
+    user = require_user(authorization)
     user_query = (query or prompt).strip()
 
     if not user_query:
@@ -1021,22 +1150,28 @@ async def research(
             detail="Please enter a research question.",
         )
 
-    document_text, image_inputs, attached_filenames = await read_uploads(
-        files
-    )
+    window_key, cost = charge_credits(user["id"], mode, len(files or []))
 
-    sources = search_web(
-        user_query,
-        mode,
-    )
+    try:
+        document_text, image_inputs, attached_filenames = await read_uploads(
+            files
+        )
 
-    answer = call_openrouter(
-        user_query,
-        mode,
-        sources,
-        document_text,
-        image_inputs,
-    )
+        sources = search_web(
+            user_query,
+            mode,
+        )
+
+        answer = call_openrouter(
+            user_query,
+            mode,
+            sources,
+            document_text,
+            image_inputs,
+        )
+    except Exception:
+        refund_credits(user["id"], window_key, cost)
+        raise
 
     return {
         "answer": answer,
@@ -1523,9 +1658,16 @@ async def chat_stream(
                 detail="Please enter a research question.",
             )
 
-    document_text, image_inputs, attached_filenames = await read_uploads(
-        files
-    )
+    # Plan rules and credits: checked before anything is saved.
+    window_key, credit_cost_taken = charge_credits(user_id, mode, len(files or []))
+
+    try:
+        document_text, image_inputs, attached_filenames = await read_uploads(
+            files
+        )
+    except Exception:
+        refund_credits(user_id, window_key, credit_cost_taken)
+        raise
 
     history = [
         {
@@ -1627,6 +1769,8 @@ async def chat_stream(
                 except Exception:
                     traceback.print_exc()
 
+        answered = False
+
         try:
             emit(
                 {
@@ -1634,6 +1778,7 @@ async def chat_stream(
                     "conversation_id": conversation_id,
                     "title": title,
                     "request_id": request_id,
+                    "credits": billing_status(user_id)["credits"],
                 }
             )
 
@@ -1706,6 +1851,7 @@ async def chat_stream(
             if generation.should_stop():
                 if answer:
                     save(answer)
+                    answered = True
                 emit({"type": "stopped"})
                 return
 
@@ -1713,6 +1859,7 @@ async def chat_stream(
                 raise ChatError("The AI returned an empty response.")
 
             message_id = save(answer)
+            answered = True
 
             emit(
                 {
@@ -1740,6 +1887,9 @@ async def chat_stream(
             )
 
         finally:
+            # No answer at all (stopped early or failed): give the credits back.
+            if not answered and not "".join(answer_parts).strip():
+                refund_credits(user_id, window_key, credit_cost_taken)
             with ACTIVE_GENERATIONS_LOCK:
                 ACTIVE_GENERATIONS.pop(request_id, None)
             generation.forget_stop_request()
@@ -1803,6 +1953,495 @@ def stop_generation(
         )
 
     return {"stopped": False}
+
+
+# ============================================================
+# 14c. PLANS, CREDITS AND PAYMENTS (Razorpay, INR)
+# Every answer costs credits. Free credits reset daily (midnight
+# IST); paid plans get a monthly allowance. Prices are in paise.
+# ============================================================
+
+IST = timezone(timedelta(hours=5, minutes=30))
+CREDIT_WINDOW_DAYS = 30
+BILLING_DAYS = {"monthly": 30, "annual": 365}
+
+PLANS = {
+    "free": {
+        "name": "Free",
+        "credits": 10,
+        "window": "day",
+        "deep_research": False,
+        "deep_cost": None,
+        "max_files": 1,
+        "prices": {},
+        "features": [
+            "10 credits every day",
+            "Web research and Academic modes",
+            "Live web sources with citations",
+            "1 file or image per message",
+            "Saved chat history",
+        ],
+        "description": "For trying SYNAPSE and light everyday research.",
+    },
+    "pro": {
+        "name": "Pro",
+        "credits": 500,
+        "window": "month",
+        "deep_research": True,
+        "deep_cost": 3,
+        "max_files": 5,
+        "prices": {"monthly": 49900, "annual": 478800},
+        "features": [
+            "500 credits every month",
+            "Deep research mode (3 credits)",
+            "Extended thinking",
+            "Up to 5 files or images per message",
+            "Everything in Free",
+        ],
+        "description": "For students and professionals who research every day.",
+    },
+    "max": {
+        "name": "Max",
+        "credits": 1400,
+        "window": "month",
+        "deep_research": True,
+        "deep_cost": 2,
+        "max_files": 10,
+        "prices": {"monthly": 129900, "annual": 1246800},
+        "features": [
+            "1,400 credits every month",
+            "Deep research for only 2 credits",
+            "Extended thinking",
+            "Up to 10 files or images per message",
+            "Everything in Pro",
+        ],
+        "description": "For heavy research, teams of one and power users.",
+    },
+}
+
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "").strip()
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "").strip()
+
+
+class CheckoutRequest(BaseModel):
+    plan: str = Field(min_length=1, max_length=20)
+    billing: str = Field(min_length=1, max_length=20)
+
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str = Field(min_length=1, max_length=100)
+    razorpay_payment_id: str = Field(min_length=1, max_length=100)
+    razorpay_signature: str = Field(min_length=1, max_length=200)
+
+
+def parse_time(value: str):
+    return datetime.fromisoformat(value)
+
+
+def active_subscription(user_id: int):
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT plan, billing, started_at, expires_at
+            FROM subscriptions WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if (
+        row
+        and row["plan"] in PLANS
+        and parse_time(row["expires_at"]) > datetime.now(timezone.utc)
+    ):
+        return row
+
+    return None
+
+
+def credit_window(user_id: int):
+    """Returns (plan_key, subscription_row, window_key, resets_at)."""
+
+    now = datetime.now(timezone.utc)
+    subscription = active_subscription(user_id)
+
+    if not subscription:
+        today = now.astimezone(IST).date()
+        midnight = datetime(today.year, today.month, today.day, tzinfo=IST)
+        return "free", None, f"free:{today.isoformat()}", midnight + timedelta(days=1)
+
+    started = parse_time(subscription["started_at"])
+    expires = parse_time(subscription["expires_at"])
+    index = int((now - started).total_seconds() // (CREDIT_WINDOW_DAYS * 86400))
+    resets = min(started + timedelta(days=CREDIT_WINDOW_DAYS * (index + 1)), expires)
+    key = f"{subscription['plan']}:{subscription['started_at']}:{index}"
+    return subscription["plan"], subscription, key, resets
+
+
+def credits_used(user_id: int, window_key: str):
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT used FROM credit_usage WHERE user_id = ? AND window_key = ?",
+            (user_id, window_key),
+        ).fetchone()
+    return row["used"] if row else 0
+
+
+def credit_cost(plan_key: str, mode: str):
+    if mode.lower() in ("deep", "deep research"):
+        return PLANS[plan_key]["deep_cost"]
+    return 1
+
+
+def billing_status(user_id: int):
+    plan_key, subscription, window_key, resets_at = credit_window(user_id)
+    plan = PLANS[plan_key]
+    used = credits_used(user_id, window_key)
+
+    return {
+        "plan": plan_key,
+        "plan_name": plan["name"],
+        "billing": subscription["billing"] if subscription else None,
+        "expires_at": subscription["expires_at"] if subscription else None,
+        "credits": {
+            "used": used,
+            "limit": plan["credits"],
+            "remaining": max(plan["credits"] - used, 0),
+            "window": plan["window"],
+            "resets_at": resets_at.isoformat(),
+        },
+        "costs": {
+            "web": 1,
+            "academic": 1,
+            "deep": plan["deep_cost"],
+        },
+        "deep_research": plan["deep_research"],
+        "max_files": plan["max_files"],
+    }
+
+
+def billing_error(status_code: int, code: str, message: str, **extra):
+    return HTTPException(
+        status_code=status_code,
+        detail={"code": code, "message": message, **extra},
+    )
+
+
+def charge_credits(user_id: int, mode: str, file_count: int):
+    """Checks the plan's rules and takes the credits for one answer.
+
+    Returns (window_key, cost) so the credits can be refunded if no
+    answer is produced. Raises 402/403 with an upgrade hint otherwise.
+    """
+
+    plan_key, _, window_key, resets_at = credit_window(user_id)
+    plan = PLANS[plan_key]
+    cost = credit_cost(plan_key, mode)
+
+    if cost is None:
+        raise billing_error(
+            403,
+            "upgrade_required",
+            "Deep research and extended thinking are part of Pro and Max. "
+            "Upgrade to use them.",
+        )
+
+    if file_count > plan["max_files"]:
+        raise billing_error(
+            403,
+            "too_many_files",
+            f"Your {plan['name']} plan allows {plan['max_files']} "
+            f"file{'s' if plan['max_files'] != 1 else ''} per message. "
+            "Upgrade to attach more.",
+        )
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO credit_usage (user_id, window_key, used)
+            VALUES (?, ?, 0)
+            ON CONFLICT (user_id, window_key) DO NOTHING
+            """,
+            (user_id, window_key),
+        )
+        # Only succeeds if the credits are still there (safe even when
+        # two answers are requested at the same moment).
+        result = connection.execute(
+            """
+            UPDATE credit_usage SET used = used + ?
+            WHERE user_id = ? AND window_key = ? AND used + ? <= ?
+            """,
+            (cost, user_id, window_key, cost, plan["credits"]),
+        )
+
+    if result.rowcount != 1:
+        when = resets_at.astimezone(IST)
+        reset_text = (
+            when.strftime("%I:%M %p IST").lstrip("0")
+            if plan["window"] == "day"
+            else when.strftime("%d %b %Y").lstrip("0")
+        )
+        raise billing_error(
+            402,
+            "out_of_credits",
+            f"You've used your {plan['credits']} {plan['name']} credits"
+            f"{' for today' if plan['window'] == 'day' else ' for this month'}. "
+            f"They reset {reset_text}. Upgrade for more.",
+            resets_at=resets_at.isoformat(),
+        )
+
+    return window_key, cost
+
+
+def refund_credits(user_id: int, window_key: str, cost: int):
+    try:
+        with get_connection() as connection:
+            connection.execute(
+                """
+                UPDATE credit_usage
+                SET used = CASE WHEN used >= ? THEN used - ? ELSE 0 END
+                WHERE user_id = ? AND window_key = ?
+                """,
+                (cost, cost, user_id, window_key),
+            )
+    except Exception:
+        traceback.print_exc()
+
+
+def activate_payment(order_id: str, payment_id: str):
+    """Marks an order paid and starts the plan. Safe to call twice."""
+
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as connection:
+        updated = connection.execute(
+            """
+            UPDATE payments SET status = 'paid', payment_id = ?, paid_at = ?
+            WHERE order_id = ? AND status = 'created'
+            """,
+            (payment_id, now.isoformat(), order_id),
+        )
+
+        payment = connection.execute(
+            "SELECT user_id, plan, billing, status FROM payments WHERE order_id = ?",
+            (order_id,),
+        ).fetchone()
+
+        if not payment:
+            return None
+
+        if updated.rowcount == 1:
+            expires = now + timedelta(days=BILLING_DAYS[payment["billing"]])
+            connection.execute(
+                """
+                INSERT INTO subscriptions
+                (user_id, plan, billing, started_at, expires_at,
+                 last_order_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    plan = excluded.plan,
+                    billing = excluded.billing,
+                    started_at = excluded.started_at,
+                    expires_at = excluded.expires_at,
+                    last_order_id = excluded.last_order_id,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    payment["user_id"],
+                    payment["plan"],
+                    payment["billing"],
+                    now.isoformat(),
+                    expires.isoformat(),
+                    order_id,
+                    now.isoformat(),
+                ),
+            )
+
+    return payment["user_id"]
+
+
+@app.get("/api/billing/plans")
+def list_plans():
+    return {
+        "currency": "INR",
+        "payments_enabled": bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
+        "annual_discount_percent": 20,
+        "plans": [
+            {
+                "id": key,
+                "name": plan["name"],
+                "credits": plan["credits"],
+                "window": plan["window"],
+                "deep_cost": plan["deep_cost"],
+                "max_files": plan["max_files"],
+                "monthly_price": plan["prices"].get("monthly", 0) // 100,
+                "annual_price": plan["prices"].get("annual", 0) // 100,
+                "features": plan["features"],
+                "description": plan["description"],
+            }
+            for key, plan in PLANS.items()
+        ],
+    }
+
+
+@app.get("/api/billing/status")
+def get_billing_status(
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+    return billing_status(user["id"])
+
+
+@app.post("/api/billing/checkout")
+def create_checkout(
+    payload: CheckoutRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+    plan_key = payload.plan.lower()
+    billing = payload.billing.lower()
+
+    if plan_key not in PLANS or billing not in PLANS[plan_key]["prices"]:
+        raise HTTPException(status_code=400, detail="Please choose Pro or Max, monthly or annual.")
+
+    if not (RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET):
+        raise HTTPException(
+            status_code=503,
+            detail="Payments are not set up yet. Add the Razorpay keys to the backend settings.",
+        )
+
+    amount = PLANS[plan_key]["prices"][billing]
+
+    try:
+        response = requests.post(
+            "https://api.razorpay.com/v1/orders",
+            auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET),
+            json={
+                "amount": amount,
+                "currency": "INR",
+                "receipt": f"syn-{user['id']}-{int(time.time())}",
+                "notes": {"user_id": str(user["id"]), "plan": plan_key, "billing": billing},
+            },
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Could not reach Razorpay. Please try again.") from exc
+
+    if not response.ok:
+        try:
+            message = response.json().get("error", {}).get("description")
+        except ValueError:
+            message = None
+        raise HTTPException(
+            status_code=502,
+            detail=f"Razorpay could not start the payment{': ' + message if message else '.'}",
+        )
+
+    order = response.json()
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO payments
+            (order_id, user_id, plan, billing, amount, currency, status, created_at)
+            VALUES (?, ?, ?, ?, ?, 'INR', 'created', ?)
+            """,
+            (order["id"], user["id"], plan_key, billing, amount, utc_now()),
+        )
+
+    return {
+        "key_id": RAZORPAY_KEY_ID,
+        "order_id": order["id"],
+        "amount": amount,
+        "currency": "INR",
+        "plan": plan_key,
+        "billing": billing,
+        "description": f"SYNAPSE {PLANS[plan_key]['name']} · {billing.capitalize()}",
+        "prefill": {"name": user["name"], "email": user["email"]},
+    }
+
+
+@app.post("/api/billing/verify")
+def verify_payment(
+    payload: VerifyPaymentRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+
+    with get_connection() as connection:
+        payment = connection.execute(
+            "SELECT order_id FROM payments WHERE order_id = ? AND user_id = ?",
+            (payload.razorpay_order_id, user["id"]),
+        ).fetchone()
+
+    if not payment or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=404, detail="Payment not found.")
+
+    # Signed with our secret: proves Razorpay really took this payment.
+    expected = hmac.new(
+        RAZORPAY_KEY_SECRET.encode(),
+        f"{payment['order_id']}|{payload.razorpay_payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, payload.razorpay_signature):
+        raise HTTPException(status_code=400, detail="Payment could not be verified.")
+
+    activate_payment(payment["order_id"], payload.razorpay_payment_id)
+    return billing_status(user["id"])
+
+
+@app.post("/api/billing/webhook")
+async def razorpay_webhook(request: Request):
+    """Backup path: Razorpay tells us about payments even if the browser
+    closed before /verify was called."""
+
+    if not RAZORPAY_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook secret is not configured.")
+
+    body = await request.body()
+    expected = hmac.new(RAZORPAY_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(expected, request.headers.get("x-razorpay-signature", "")):
+        raise HTTPException(status_code=400, detail="Invalid signature.")
+
+    try:
+        event = json.loads(body)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid body.")
+
+    if event.get("event") in ("payment.captured", "order.paid"):
+        entity = event.get("payload", {}).get("payment", {}).get("entity", {})
+        if entity.get("order_id") and entity.get("id"):
+            activate_payment(entity["order_id"], entity["id"])
+
+    return {"ok": True}
+
+
+@app.get("/api/billing/payments")
+def list_payments(
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT order_id, plan, billing, amount, currency, paid_at
+            FROM payments
+            WHERE user_id = ? AND status = 'paid'
+            ORDER BY paid_at DESC
+            LIMIT 20
+            """,
+            (user["id"],),
+        ).fetchall()
+
+    return {
+        "payments": [
+            {**dict(row), "amount": row["amount"] / 100}
+            for row in rows
+        ],
+    }
 
 
 # ============================================================

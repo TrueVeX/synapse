@@ -10,3 +10,5 @@ export const Button = React.forwardRef<HTMLButtonElement,ButtonProps>(({classNam
  return <C ref={ref} className={cn(variants({variant,size,className}))} {...props}/>;
 });
 Button.displayName="Button";
+// Same styles for links and other elements that should look like buttons (used by the pricing page).
+export const buttonVariants = variants;

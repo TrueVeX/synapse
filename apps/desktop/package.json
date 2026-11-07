@@ -1,0 +1,47 @@
+{
+  "name": "synapse-desktop",
+  "productName": "SYNAPSE",
+  "version": "1.0.0",
+  "description": "SYNAPSE AI research assistant for Windows. Created by Revoori Ashwath Reddy at HumanForm Studios.",
+  "author": "HumanForm Studios",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "prepare-files": "node scripts/prepare.js",
+    "start": "npm run prepare-files && electron .",
+    "dist": "npm run prepare-files && electron-builder --win nsis portable"
+  },
+  "build": {
+    "appId": "com.humanformstudios.synapse",
+    "productName": "SYNAPSE",
+    "copyright": "© HumanForm Studios · Created by Revoori Ashwath Reddy",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "offline.html",
+      "app.config.json",
+      "build/icon.png"
+    ],
+    "win": {
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "SYNAPSE",
+      "artifactName": "SYNAPSE-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "SYNAPSE-Portable-${version}.exe"
+    }
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  }
+}

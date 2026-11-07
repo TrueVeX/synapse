@@ -1,0 +1,19 @@
+{
+  "name": "synapse-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SYNAPSE AI research assistant for Android. Created by Revoori Ashwath Reddy at HumanForm Studios.",
+  "scripts": {
+    "prepare-files": "node scripts/prepare.js",
+    "sync": "npm run prepare-files && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "4.0.0",
+    "@capacitor/cli": "8.6.0",
+    "@resvg/resvg-js": "2.6.2"
+  }
+}
