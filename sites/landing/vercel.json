@@ -7,7 +7,7 @@
     { "source": "/windows", "destination": "https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE-Setup.exe", "permanent": false },
     { "source": "/android", "destination": "https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE.apk", "permanent": false },
     { "source": "/app", "destination": "https://synapse-humanform.vercel.app", "permanent": false },
-    { "source": "/docs", "destination": "https://synapse-docs.vercel.app", "permanent": false }
+    { "source": "/docs", "destination": "https://synapse-humanform-docs.vercel.app", "permanent": false }
   ],
   "headers": [
     {

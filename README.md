@@ -90,6 +90,14 @@ The repository is ready to deploy as **two Vercel projects**: one with root dire
 
 On Vercel the backend refuses to start without `DATABASE_URL` or with a weak `JWT_SECRET`. Vercel limits each request to about 4.5 MB of uploads and 300 seconds.
 
+## Websites
+
+| Site | Address | Source |
+|---|---|---|
+| SYNAPSE (the app) | https://synapse-humanform.vercel.app | `frontend/` + `backend/` |
+| Home page and downloads | https://synapse-download.vercel.app | `sites/landing/` (static HTML) |
+| Documentation | https://synapse-humanform-docs.vercel.app | `sites/docs/` (Markdown, built with `npm run build`) |
+
 ## Windows and Android apps
 
 The apps in `apps/` open the deployed SYNAPSE website, so they always show the latest version. First set your website address in `apps/app.config.json` (`"url": "https://your-site.vercel.app"`); until then the apps show a "not connected yet" screen.

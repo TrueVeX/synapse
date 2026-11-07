@@ -32,7 +32,7 @@ description: The studio and the person behind SYNAPSE.
 
 - **Use SYNAPSE**: [synapse-humanform.vercel.app](https://synapse-humanform.vercel.app)
 - **Home and downloads**: [synapse-download.vercel.app](https://synapse-download.vercel.app)
-- **Documentation**: [synapse-docs.vercel.app](https://synapse-docs.vercel.app)
+- **Documentation**: [synapse-humanform-docs.vercel.app](https://synapse-humanform-docs.vercel.app)
 - **Source code**: [github.com/TrueVeX/synapse](https://github.com/TrueVeX/synapse)
 
 ## Contact

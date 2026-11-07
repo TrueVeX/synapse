@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  Download,
+  LifeBuoy,
   LogOut,
   MessagesSquare,
   MoreHorizontal,
@@ -264,6 +266,23 @@ function DeleteDialog({
   );
 }
 
+const MENU_LINK =
+  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent";
+
+/** Links to the SYNAPSE home page (app downloads) and the documentation. */
+function ExternalLinks() {
+  return (
+    <>
+      <a href="https://synapse-download.vercel.app/#download" target="_blank" rel="noopener" className={MENU_LINK}>
+        <Download className="size-4" /> Download apps
+      </a>
+      <a href="https://synapse-humanform-docs.vercel.app" target="_blank" rel="noopener" className={MENU_LINK}>
+        <LifeBuoy className="size-4" /> Help &amp; docs
+      </a>
+    </>
+  );
+}
+
 type SidebarProps = {
   user: User;
   conversations: Conversation[];
@@ -362,6 +381,7 @@ function SidebarPanel({
             <Link href="/pricing" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
               <CreditCard className="size-4" /> Plans &amp; billing
             </Link>
+            <ExternalLinks />
             <MenuItem icon={<LogOut className="size-4" />} onClick={props.onSignOut}>
               Sign out
             </MenuItem>
@@ -486,6 +506,7 @@ function SidebarPanel({
           <Link href="/pricing" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
               <CreditCard className="size-4" /> Plans &amp; billing
             </Link>
+            <ExternalLinks />
             <MenuItem icon={<LogOut className="size-4" />} onClick={props.onSignOut}>
             Sign out
           </MenuItem>

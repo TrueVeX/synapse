@@ -13,7 +13,7 @@ const outDir = join(root, "dist");
 
 const SITE = {
   name: "SYNAPSE Docs",
-  url: "https://synapse-docs.vercel.app",
+  url: "https://synapse-humanform-docs.vercel.app",
   app: "https://synapse-humanform.vercel.app",
   home: "https://synapse-download.vercel.app",
   repo: "https://github.com/TrueVeX/synapse",

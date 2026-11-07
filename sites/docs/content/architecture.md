@@ -35,7 +35,7 @@ SYNAPSE is a web application with a separate frontend and backend, a Postgres da
 | Windows app | Electron 45, packaged with electron-builder | GitHub Releases |
 | Android app | Capacitor 8 | GitHub Releases |
 | Landing page | Hand-written HTML, CSS and JavaScript | Vercel: `synapse-download.vercel.app` |
-| Documentation | Markdown built with `marked` into static HTML | Vercel: `synapse-docs.vercel.app` |
+| Documentation | Markdown built with `marked` into static HTML | Vercel: `synapse-humanform-docs.vercel.app` |
 
 ## Frontend
 
@@ -155,6 +155,6 @@ Both add `SynapseApp` to the browser's user agent, which the website uses to hid
 | `synapse-ai` | `frontend/` | synapse-humanform.vercel.app |
 | `synapse-ai-research` | `backend/` | synapse-ai-research.vercel.app |
 | `synapse-download` | `sites/landing/` | synapse-download.vercel.app |
-| `synapse-docs` | `sites/docs/` | synapse-docs.vercel.app |
+| `synapse-docs` | `sites/docs/` | synapse-humanform-docs.vercel.app |
 
 All four deploy automatically from the `main` branch of the GitHub repository. Secrets (API keys, database URL, JWT and Razorpay secrets) are stored as Vercel environment variables, never in the repository. App installers are published as GitHub Releases.
