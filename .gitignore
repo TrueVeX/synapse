@@ -37,3 +37,6 @@ apps/mobile/capacitor.config.json
 .backup-before-chat-ui/
 .ui-test-tmp/
 CLAUDE_HANDOFF.md
+
+# Build logs
+*.log

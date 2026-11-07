@@ -250,7 +250,7 @@ export function SignUp({ mode = "signup" }: { mode?: Mode }) {
                 <Globe className="size-4 text-primary" /> Live web sources on every answer
               </li>
               <li className="flex items-center gap-2.5">
-                <Sparkles className="size-4 text-primary" /> 10 free credits every day
+                <Sparkles className="size-4 text-primary" /> 110 free credits every day
               </li>
               <li className="flex items-center gap-2.5">
                 <ShieldCheck className="size-4 text-primary" /> Your chats stay private to your account

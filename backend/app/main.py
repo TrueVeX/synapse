@@ -1968,14 +1968,14 @@ BILLING_DAYS = {"monthly": 30, "annual": 365}
 PLANS = {
     "free": {
         "name": "Free",
-        "credits": 10,
+        "credits": 110,
         "window": "day",
         "deep_research": False,
         "deep_cost": None,
         "max_files": 1,
         "prices": {},
         "features": [
-            "10 credits every day",
+            "110 credits every day",
             "Web research and Academic modes",
             "Live web sources with citations",
             "1 file or image per message",
@@ -1985,14 +1985,14 @@ PLANS = {
     },
     "pro": {
         "name": "Pro",
-        "credits": 500,
+        "credits": 600,
         "window": "month",
         "deep_research": True,
         "deep_cost": 3,
         "max_files": 5,
         "prices": {"monthly": 49900, "annual": 478800},
         "features": [
-            "500 credits every month",
+            "600 credits every month",
             "Deep research mode (3 credits)",
             "Extended thinking",
             "Up to 5 files or images per message",
@@ -2002,14 +2002,14 @@ PLANS = {
     },
     "max": {
         "name": "Max",
-        "credits": 1400,
+        "credits": 1500,
         "window": "month",
         "deep_research": True,
         "deep_cost": 2,
         "max_files": 10,
         "prices": {"monthly": 129900, "annual": 1246800},
         "features": [
-            "1,400 credits every month",
+            "1,500 credits every month",
             "Deep research for only 2 credits",
             "Extended thinking",
             "Up to 10 files or images per message",
