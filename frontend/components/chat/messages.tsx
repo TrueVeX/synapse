@@ -239,14 +239,17 @@ type AssistantMessageProps = {
   isLast: boolean;
   canRetry: boolean;
   onRetry: () => void;
+  /** Settings → Show thinking. */
+  showThinking?: boolean;
 };
 
-export function AssistantMessage({ message, isLast, canRetry, onRetry }: AssistantMessageProps) {
+export function AssistantMessage({ message, isLast, canRetry, onRetry, showThinking = true }: AssistantMessageProps) {
   const shown = useSmoothText(message.content, Boolean(message.animate));
   const generating = message.status === "pending" || message.status === "streaming";
   const revealing = generating || shown.length < message.content.length;
   const searching = message.search?.state === "searching";
-  const waitingForWords = generating && !message.content && !searching && !message.thinking;
+  const thinkingShown = showThinking && Boolean(message.thinking);
+  const waitingForWords = generating && !message.content && !searching && !thinkingShown;
   const thinkingActive = generating && !message.content && Boolean(message.thinking);
 
   return (
@@ -260,7 +263,7 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry }: Assista
         <WebSearchBlock search={message.search} sources={message.sources ?? []} />
       )}
 
-      {message.thinking && <ThinkingBlock message={message} active={thinkingActive} />}
+      {thinkingShown && <ThinkingBlock message={message} active={thinkingActive} />}
 
       {waitingForWords && (
         <div className="mb-2" role="status" aria-live="polite">

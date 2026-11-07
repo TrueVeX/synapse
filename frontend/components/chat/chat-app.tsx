@@ -8,6 +8,7 @@ import { ArrowDown, FileSearch, GraduationCap, Menu, Scale, Search, Sparkles, Sq
 import ClaudeChatInput, { type ChatInputSubmit, type Model } from "@/components/ui/claude-style-chat-input";
 import {
   ApiError,
+  DEFAULT_SETTINGS,
   api,
   clearToken,
   getToken,
@@ -17,14 +18,18 @@ import {
   type BillingStatus,
   type Conversation,
   type StoredMessage,
+  type SettingsResponse,
   type StreamEvent,
   type User,
+  type UserSettings,
 } from "@/lib/api";
+import { watchSystemTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { AssistantMessage, ConversationSkeleton, UserMessage, type UIMessage } from "./messages";
 import { Sidebar } from "./sidebar";
 import { SynapseMark } from "./synapse-mark";
 import { resetLabel } from "./credit-meter";
+import { SettingsDialog } from "./settings-dialog";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
@@ -182,6 +187,9 @@ export default function ChatApp() {
   const [toast, setToast] = useState<string | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [showJump, setShowJump] = useState(false);
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const [languages, setLanguages] = useState<string[] | undefined>();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const activeIdRef = useRef<string | null>(null);
   const streamingRef = useRef(false);
@@ -216,7 +224,15 @@ export default function ChatApp() {
     setBootError(null);
 
     try {
-      const me = await api<{ user: User }>("/api/auth/me");
+      // Settings load alongside the account so the first screen already uses them.
+      const [me, saved] = await Promise.all([
+        api<{ user: User }>("/api/auth/me"),
+        api<SettingsResponse>("/api/settings").catch(() => null),
+      ]);
+      if (saved) {
+        setSettings(saved.settings);
+        setLanguages(saved.options.languages);
+      }
       setUser(me.user);
     } catch (error) {
       // 401 = bad/expired login, 404 = the account no longer exists.
@@ -245,6 +261,9 @@ export default function ChatApp() {
   useEffect(() => {
     boot();
   }, [boot]);
+
+  // "System" theme follows the device's light/dark setting live.
+  useEffect(() => watchSystemTheme(), []);
 
   // ---- Sidebar collapse (remembered per browser) -------------------------
   useEffect(() => {
@@ -612,6 +631,11 @@ export default function ChatApp() {
     [navigate, showToast, signOut],
   );
 
+  const clearAllChats = useCallback(() => {
+    setConversations([]);
+    navigate(null);
+  }, [navigate]);
+
   const activeTitle = conversations.find((item) => item.id === activeId)?.title;
   const modes = useMemo(() => researchModes(billing), [billing]);
 
@@ -649,12 +673,17 @@ export default function ChatApp() {
     </motion.div>
   );
 
+  // Deep research can be the default only on plans that include it.
+  const defaultMode =
+    settings.default_mode === "deep" && billing && !billing.deep_research ? "web" : settings.default_mode;
+
   const composer = (position: "center" | "bottom") => (
     <motion.div layoutId="synapse-composer" transition={{ type: "spring", stiffness: 260, damping: 32 }} className="w-full">
       <ClaudeChatInput
+        key={defaultMode}
         className="max-w-3xl"
         models={modes}
-        defaultModel="web"
+        defaultModel={defaultMode}
         placeholder={position === "center" ? "What would you like to research today?" : "Reply to SYNAPSE..."}
         accept={ACCEPTED_FILES}
         isStreaming={isStreaming}
@@ -681,7 +710,25 @@ export default function ChatApp() {
         onRename={renameConversation}
         onDelete={deleteConversation}
         onSignOut={signOut}
+        onOpenSettings={() => {
+          setMobileOpen(false);
+          setSettingsOpen(true);
+        }}
         billing={billing}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        user={user}
+        billing={billing}
+        settings={settings}
+        languages={languages}
+        onSettingsChange={setSettings}
+        onUserChange={setUser}
+        onChatsCleared={clearAllChats}
+        onSignOut={signOut}
+        onToast={showToast}
       />
 
       <main className="relative flex min-w-0 flex-1 flex-col">
@@ -738,6 +785,7 @@ export default function ChatApp() {
                             isLast={index === messages.length - 1}
                             canRetry={!isStreaming}
                             onRetry={retry}
+                            showThinking={settings.show_thinking}
                           />
                         ),
                       )}

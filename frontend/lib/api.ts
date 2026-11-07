@@ -67,6 +67,33 @@ export type PlansResponse = {
   plans: PlanInfo[];
 };
 
+export type ResponseStyle = "default" | "concise" | "detailed" | "formal" | "friendly";
+
+export type UserSettings = {
+  personalization_enabled: boolean;
+  about_me: string;
+  instructions: string;
+  style: ResponseStyle;
+  language: string;
+  default_mode: "web" | "academic" | "deep";
+  show_thinking: boolean;
+};
+
+export type SettingsResponse = {
+  settings: UserSettings;
+  options: { styles: ResponseStyle[]; languages: string[] };
+};
+
+export const DEFAULT_SETTINGS: UserSettings = {
+  personalization_enabled: true,
+  about_me: "",
+  instructions: "",
+  style: "default",
+  language: "auto",
+  default_mode: "web",
+  show_thinking: true,
+};
+
 /** Billing error codes sent by the backend with 402/403 responses. */
 export const UPGRADE_CODES = ["out_of_credits", "upgrade_required", "too_many_files"];
 

@@ -13,6 +13,7 @@ import {
   Sparkles,
   Pencil,
   Plus,
+  Settings,
   Trash2,
   X,
 } from "lucide-react";
@@ -276,6 +277,7 @@ type SidebarProps = {
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSignOut: () => void;
+  onOpenSettings: () => void;
   billing: BillingStatus | null;
 };
 
@@ -331,6 +333,9 @@ function SidebarPanel({
           <MessagesSquare className="size-[18px]" />
         </RailButton>
         <div className="flex-1" />
+        <RailButton label="Settings" onClick={props.onOpenSettings}>
+          <Settings className="size-[18px]" />
+        </RailButton>
         <Link
           href="/pricing"
           title="Plans and credits"
@@ -345,6 +350,15 @@ function SidebarPanel({
           </button>
           <Popover open={userMenuOpen} className="bottom-11 left-0 origin-bottom-left">
             <div className="px-2.5 py-2 text-xs text-muted-foreground">{user.email}</div>
+            <MenuItem
+              icon={<Settings className="size-4" />}
+              onClick={() => {
+                setUserMenuOpen(false);
+                props.onOpenSettings();
+              }}
+            >
+              Settings
+            </MenuItem>
             <Link href="/pricing" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
               <CreditCard className="size-4" /> Plans &amp; billing
             </Link>
@@ -364,15 +378,20 @@ function SidebarPanel({
           <SynapseMark size={22} />
           <span className="font-serif text-xl tracking-tight text-card-foreground">SYNAPSE</span>
         </div>
-        {isMobile ? (
-          <RailButton label="Close sidebar" onClick={props.onCloseMobile}>
-            <X className="size-[18px]" />
+        <div className="flex items-center gap-0.5">
+          <RailButton label="Settings" onClick={props.onOpenSettings}>
+            <Settings className="size-[18px]" />
           </RailButton>
-        ) : (
-          <RailButton label="Collapse sidebar" onClick={props.onToggleCollapsed}>
-            <PanelLeftClose className="size-[18px]" />
-          </RailButton>
-        )}
+          {isMobile ? (
+            <RailButton label="Close sidebar" onClick={props.onCloseMobile}>
+              <X className="size-[18px]" />
+            </RailButton>
+          ) : (
+            <RailButton label="Collapse sidebar" onClick={props.onToggleCollapsed}>
+              <PanelLeftClose className="size-[18px]" />
+            </RailButton>
+          )}
+        </div>
       </div>
 
       <div className="px-2">
@@ -455,6 +474,15 @@ function SidebarPanel({
           <div className="px-2.5 py-2 text-xs text-muted-foreground">
             {props.billing ? `${props.billing.plan_name} plan` : "Account"}
           </div>
+          <MenuItem
+            icon={<Settings className="size-4" />}
+            onClick={() => {
+              setUserMenuOpen(false);
+              props.onOpenSettings();
+            }}
+          >
+            Settings
+          </MenuItem>
           <Link href="/pricing" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent">
               <CreditCard className="size-4" /> Plans &amp; billing
             </Link>

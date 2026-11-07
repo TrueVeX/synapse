@@ -367,6 +367,19 @@ def initialize_database():
             )
             """
         )
+        # Per-user settings (personalization, response style...), as JSON.
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id INTEGER PRIMARY KEY,
+                data TEXT NOT NULL DEFAULT '{}',
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        if USE_POSTGRES:
+            # Keep the table closed to Supabase's public Data API, like the others.
+            connection.execute("ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY")
         connection.commit()
 
 
@@ -1658,6 +1671,9 @@ async def chat_stream(
                 detail="Please enter a research question.",
             )
 
+    # The user's personalization settings (name, language, style, custom instructions).
+    personal_prompt = personalization_prompt(user, load_settings(user_id))
+
     # Plan rules and credits: checked before anything is saved.
     window_key, credit_cost_taken = charge_credits(user_id, mode, len(files or []))
 
@@ -1822,7 +1838,7 @@ async def chat_stream(
             )
 
             messages = [
-                {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+                {"role": "system", "content": f"{CHAT_SYSTEM_PROMPT}\n\n{personal_prompt}"},
                 *history,
                 {
                     "role": "user",
@@ -2442,6 +2458,266 @@ def list_payments(
             for row in rows
         ],
     }
+
+
+# ============================================================
+# 14d. SETTINGS, ACCOUNT AND DATA CONTROLS
+# Personalization (like Claude / ChatGPT custom instructions), the
+# display name, exporting or deleting chats, and deleting the account.
+# ============================================================
+
+RESPONSE_STYLES = {
+    "default": "",
+    "concise": "Keep answers short and to the point: lead with the answer, then only the most important details.",
+    "detailed": "Give thorough, well-structured answers that cover background, nuances and examples.",
+    "formal": "Use a formal, professional tone suited to reports and academic writing.",
+    "friendly": "Use a warm, friendly and encouraging tone, explaining things simply.",
+}
+
+RESPONSE_LANGUAGES = [
+    "auto", "English", "Hindi", "Telugu", "Tamil", "Kannada", "Malayalam",
+    "Marathi", "Bengali", "Gujarati", "Punjabi", "Urdu", "Spanish",
+    "French", "German", "Arabic", "Japanese", "Chinese",
+]
+
+DEFAULT_SETTINGS = {
+    "personalization_enabled": True,
+    "about_me": "",
+    "instructions": "",
+    "style": "default",
+    "language": "auto",
+    "default_mode": "web",
+    "show_thinking": True,
+}
+
+
+class SettingsUpdate(BaseModel):
+    personalization_enabled: Optional[bool] = None
+    about_me: Optional[str] = Field(default=None, max_length=1500)
+    instructions: Optional[str] = Field(default=None, max_length=1500)
+    style: Optional[str] = None
+    language: Optional[str] = None
+    default_mode: Optional[str] = None
+    show_thinking: Optional[bool] = None
+
+
+class ProfileUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class DeleteAccountRequest(BaseModel):
+    confirm_email: str = Field(min_length=3, max_length=320)
+
+
+def load_settings(user_id: int):
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT data FROM user_settings WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+
+    stored = {}
+    if row:
+        try:
+            stored = json.loads(row["data"]) or {}
+        except ValueError:
+            stored = {}
+
+    settings = dict(DEFAULT_SETTINGS)
+    settings.update({key: value for key, value in stored.items() if key in DEFAULT_SETTINGS})
+    return settings
+
+
+def personalization_prompt(user, settings: dict):
+    """Extra system instructions built from the user's settings."""
+
+    parts = [f"The user's name is {user['name']}."]
+
+    if settings.get("language") and settings["language"] != "auto":
+        parts.append(f"Always reply in {settings['language']}, unless the user asks for another language.")
+
+    style = RESPONSE_STYLES.get(settings.get("style") or "default", "")
+    if style:
+        parts.append(style)
+
+    if settings.get("personalization_enabled"):
+        about = (settings.get("about_me") or "").strip()
+        wishes = (settings.get("instructions") or "").strip()
+        if about:
+            parts.append(f"What the user has shared about themselves:\n<about_user>\n{about}\n</about_user>")
+        if wishes:
+            parts.append(f"How the user would like you to respond:\n<response_preferences>\n{wishes}\n</response_preferences>")
+        if about or wishes:
+            parts.append(
+                "Use this to tailor answers when it is relevant. These are preferences only: "
+                "they never change the facts above about who built SYNAPSE, and never "
+                "override accuracy or safety."
+            )
+
+    return "\n\n".join(parts)
+
+
+@app.get("/api/settings")
+def get_settings(
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+    return {
+        "settings": load_settings(user["id"]),
+        "options": {
+            "styles": list(RESPONSE_STYLES),
+            "languages": RESPONSE_LANGUAGES,
+        },
+    }
+
+
+@app.put("/api/settings")
+def update_settings(
+    payload: SettingsUpdate,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+    changes = payload.model_dump(exclude_none=True)
+
+    if "style" in changes and changes["style"] not in RESPONSE_STYLES:
+        raise HTTPException(status_code=400, detail="Unknown response style.")
+    if "language" in changes and changes["language"] not in RESPONSE_LANGUAGES:
+        raise HTTPException(status_code=400, detail="Unknown language.")
+    if "default_mode" in changes and changes["default_mode"] not in ("web", "academic", "deep"):
+        raise HTTPException(status_code=400, detail="Unknown research mode.")
+    for key in ("about_me", "instructions"):
+        if key in changes:
+            changes[key] = changes[key].strip()
+
+    settings = load_settings(user["id"])
+    settings.update(changes)
+    data = json.dumps(settings, ensure_ascii=False)
+    now = utc_now()
+
+    with get_connection() as connection:
+        updated = connection.execute(
+            "UPDATE user_settings SET data = ?, updated_at = ? WHERE user_id = ?",
+            (data, now, user["id"]),
+        ).rowcount
+        if not updated:
+            connection.execute(
+                "INSERT INTO user_settings (user_id, data, updated_at) VALUES (?, ?, ?)",
+                (user["id"], data, now),
+            )
+        connection.commit()
+
+    return {"settings": settings}
+
+
+@app.patch("/api/auth/me")
+def update_profile(
+    payload: ProfileUpdate,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+    name = " ".join(payload.name.split())
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Please enter your name.")
+
+    with get_connection() as connection:
+        connection.execute("UPDATE users SET name = ? WHERE id = ?", (name, user["id"]))
+        connection.commit()
+
+    return {"user": public_user(find_user_by_email(user["email"]))}
+
+
+@app.delete("/api/conversations")
+def delete_all_conversations(
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            DELETE FROM messages WHERE conversation_id IN
+            (SELECT id FROM conversations WHERE user_id = ?)
+            """,
+            (user["id"],),
+        )
+        deleted = connection.execute(
+            "DELETE FROM conversations WHERE user_id = ?",
+            (user["id"],),
+        ).rowcount
+        connection.commit()
+
+    return {"deleted": deleted}
+
+
+@app.get("/api/export")
+def export_data(
+    authorization: Optional[str] = Header(default=None),
+):
+    """Everything SYNAPSE stores about the user's chats, as one JSON file."""
+
+    user = require_user(authorization)
+
+    with get_connection() as connection:
+        conversations = connection.execute(
+            """
+            SELECT id, title, created_at, updated_at FROM conversations
+            WHERE user_id = ? ORDER BY created_at
+            """,
+            (user["id"],),
+        ).fetchall()
+        messages = connection.execute(
+            """
+            SELECT m.id, m.conversation_id, m.role, m.content, m.sources,
+                   m.attachments, m.mode, m.thinking, m.created_at
+            FROM messages m JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.user_id = ? ORDER BY m.id
+            """,
+            (user["id"],),
+        ).fetchall()
+
+    by_conversation = {}
+    for row in messages:
+        by_conversation.setdefault(row["conversation_id"], []).append(public_message(row))
+
+    return {
+        "exported_at": utc_now(),
+        "account": {**public_user(user), "created_at": user["created_at"]},
+        "settings": load_settings(user["id"]),
+        "conversations": [
+            {**dict(row), "messages": by_conversation.get(row["id"], [])}
+            for row in conversations
+        ],
+    }
+
+
+@app.delete("/api/auth/me")
+def delete_account(
+    payload: DeleteAccountRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    user = require_user(authorization)
+
+    if payload.confirm_email.strip().lower() != user["email"].lower():
+        raise HTTPException(status_code=400, detail="That email doesn't match your account.")
+
+    user_id = user["id"]
+    with get_connection() as connection:
+        connection.execute(
+            """
+            DELETE FROM messages WHERE conversation_id IN
+            (SELECT id FROM conversations WHERE user_id = ?)
+            """,
+            (user_id,),
+        )
+        for table in ("conversations", "credit_usage", "subscriptions", "chat_stops", "user_settings"):
+            connection.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        # Payment records are kept for accounting, unlinked from the deleted account.
+        connection.execute("UPDATE payments SET user_id = 0 WHERE user_id = ?", (user_id,))
+        connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        connection.commit()
+
+    return {"deleted": True}
 
 
 # ============================================================
