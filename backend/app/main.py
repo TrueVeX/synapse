@@ -265,7 +265,46 @@ def duplicate_key_errors():
     return tuple(errors)
 
 
+APP_TABLES = (
+    "users", "conversations", "messages", "subscriptions", "payments",
+    "credit_usage", "chat_stops", "user_settings", "razorpay_subscriptions",
+)
+APP_INDEXES = ("idx_conversations_user", "idx_messages_conversation")
+
+
+def database_ready():
+    """Postgres only: True when every table, index and RLS setting already
+    exists. Each Vercel cold start would otherwise re-run the CREATE / ALTER
+    statements, which briefly lock tables and can clash with live requests."""
+
+    with get_connection() as connection:
+        tables = connection.execute(
+            """
+            SELECT c.relname, c.relrowsecurity FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'r'
+            """
+        ).fetchall()
+        indexes = connection.execute(
+            "SELECT indexname FROM pg_indexes WHERE schemaname = 'public'"
+        ).fetchall()
+
+    found = {row["relname"]: row["relrowsecurity"] for row in tables}
+    return (
+        all(name in found for name in APP_TABLES)
+        and found.get("user_settings") and found.get("razorpay_subscriptions")
+        and set(APP_INDEXES) <= {row["indexname"] for row in indexes}
+    )
+
+
 def initialize_database():
+    if USE_POSTGRES:
+        try:
+            if database_ready():
+                return
+        except Exception:
+            traceback.print_exc()  # fall through and create what's missing
+
     with get_connection() as connection:
         connection.execute(
             """
