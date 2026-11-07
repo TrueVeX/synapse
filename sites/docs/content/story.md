@@ -9,7 +9,7 @@ Every product has a list of features. This page is the other half: how SYNAPSE c
 
 SYNAPSE is built around a simple idea. AI assistants write fluently but can be unsure of their facts; search engines find facts but leave the reading to you. SYNAPSE, created by **Revoori Ashwath Reddy** at **HumanForm Studios**, combines the two: it searches first, reads properly, and then writes an answer that shows exactly where each claim came from.
 
-The name fits that idea: a connection between a question and the knowledge spread across the web, the way a synapse connects two neurons. The logo, a central node with six branches, carries the same image, and it's what you see animating at the top of the [SYNAPSE home page](https://synapse-download.vercel.app).
+The name fits that idea: a connection between a question and the knowledge spread across the web, the way a synapse connects two neurons. The logo, a central node with six branches, carries the same image, and it's what you see animating at the top of the [SYNAPSE home page](https://humanform-synapse.vercel.app).
 
 ## Chapter 1: Making it work
 

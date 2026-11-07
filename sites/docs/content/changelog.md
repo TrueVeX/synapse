@@ -52,5 +52,5 @@ The first public release of SYNAPSE on the web, Windows and Android.
 
 ### Sites
 
-- [synapse-download.vercel.app](https://synapse-download.vercel.app): the SYNAPSE home page with downloads.
+- [humanform-synapse.vercel.app](https://humanform-synapse.vercel.app): the SYNAPSE home page with downloads.
 - [synapse-humanform-docs.vercel.app](https://synapse-humanform-docs.vercel.app): this documentation.

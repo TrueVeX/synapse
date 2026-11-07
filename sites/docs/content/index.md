@@ -36,7 +36,7 @@ SYNAPSE was created by **Revoori Ashwath Reddy** at **HumanForm Studios**.
 | | |
 |---|---|
 | **Web app** | [synapse-humanform.vercel.app](https://synapse-humanform.vercel.app) |
-| **Downloads** | [synapse-download.vercel.app](https://synapse-download.vercel.app/#download): Windows 10/11 (64-bit) and Android 7.0+ |
+| **Downloads** | [humanform-synapse.vercel.app](https://humanform-synapse.vercel.app/#download): Windows 10/11 (64-bit) and Android 7.0+ |
 | **Default AI model** | NVIDIA Nemotron, through OpenRouter |
 | **Web search** | Tavily: up to 6 sources per question |
 | **Research modes** | Web research, Academic, Deep research |

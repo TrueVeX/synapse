@@ -273,7 +273,7 @@ const MENU_LINK =
 function ExternalLinks() {
   return (
     <>
-      <a href="https://synapse-download.vercel.app/#download" target="_blank" rel="noopener" className={MENU_LINK}>
+      <a href="https://humanform-synapse.vercel.app/#download" target="_blank" rel="noopener" className={MENU_LINK}>
         <Download className="size-4" /> Download apps
       </a>
       <a href="https://synapse-humanform-docs.vercel.app" target="_blank" rel="noopener" className={MENU_LINK}>

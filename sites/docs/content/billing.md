@@ -16,7 +16,7 @@ SYNAPSE Pro and Max are **subscriptions** that renew automatically, monthly or y
 5. You return to SYNAPSE and see **"Welcome to SYNAPSE Pro!"** (or Max). Your new credits are ready straight away.
 
 > [!TIP]
-> In the Android app, choosing UPI opens your UPI app directly. If you don't see UPI, update to the latest version of the app from the [download page](https://synapse-download.vercel.app/#download).
+> In the Android app, choosing UPI opens your UPI app directly. If you don't see UPI, update to the latest version of the app from the [download page](https://humanform-synapse.vercel.app/#download).
 
 ### How SYNAPSE confirms your payment
 

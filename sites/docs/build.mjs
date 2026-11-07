@@ -15,7 +15,7 @@ const SITE = {
   name: "SYNAPSE Docs",
   url: "https://synapse-humanform-docs.vercel.app",
   app: "https://synapse-humanform.vercel.app",
-  home: "https://synapse-download.vercel.app",
+  home: "https://humanform-synapse.vercel.app",
   repo: "https://github.com/TrueVeX/synapse",
   editBase: "https://github.com/TrueVeX/synapse/blob/main/sites/docs/content/",
 };

@@ -95,7 +95,7 @@ On Vercel the backend refuses to start without `DATABASE_URL` or with a weak `JW
 | Site | Address | Source |
 |---|---|---|
 | SYNAPSE (the app) | https://synapse-humanform.vercel.app | `frontend/` + `backend/` |
-| Home page and downloads | https://synapse-download.vercel.app | `sites/landing/` (static HTML) |
+| Home page and downloads | https://humanform-synapse.vercel.app | `sites/landing/` (static HTML) |
 | Documentation | https://synapse-humanform-docs.vercel.app | `sites/docs/` (Markdown, built with `npm run build`) |
 
 ## Windows and Android apps

@@ -4,7 +4,7 @@ nav: Windows and Android
 description: Download, install, update and uninstall the SYNAPSE apps for Windows and Android.
 ---
 
-SYNAPSE has apps for **Windows 10 and 11** and **Android 7.0 and later**. Download them from the [SYNAPSE download page](https://synapse-download.vercel.app/#download).
+SYNAPSE has apps for **Windows 10 and 11** and **Android 7.0 and later**. Download them from the [SYNAPSE download page](https://humanform-synapse.vercel.app/#download).
 
 The apps open the live SYNAPSE service in their own window. That means:
 
@@ -54,7 +54,7 @@ Requirements: Android 7.0 or later.
 
 ### Installing
 
-1. On your phone, open the [download page](https://synapse-download.vercel.app/#download) and tap **Download APK**. (Or download it on a computer and copy it to the phone's **Download** folder.)
+1. On your phone, open the [download page](https://humanform-synapse.vercel.app/#download) and tap **Download APK**. (Or download it on a computer and copy it to the phone's **Download** folder.)
 2. Open the downloaded **`SYNAPSE.apk`** from the notification or the **Files** app.
 3. If Android says *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings**, turn on **Allow from this source**, and go back.
 4. Tap **Install**.
