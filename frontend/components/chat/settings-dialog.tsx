@@ -560,14 +560,24 @@ function AccountTab({
         </Row>
         <Row
           label="Plan"
-          description={billing ? `${billing.plan_name} · ${billing.credits.remaining} of ${billing.credits.limit} credits left` : "Your plan and credits."}
+          description={
+            billing
+              ? `${billing.plan_name} · ${billing.credits.remaining} of ${billing.credits.limit} credits left${
+                  billing.autopay && !billing.autopay.cancel_at_period_end
+                    ? " · renews automatically"
+                    : billing.autopay?.cancel_at_period_end
+                      ? " · auto-renew off"
+                      : ""
+                }`
+              : "Your plan and credits."
+          }
         >
           <Link
             href="/pricing"
             className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-accent sm:h-9"
           >
             <Sparkles className="size-4 text-primary" />
-            {billing?.plan === "max" ? "Manage plan" : "Upgrade"}
+            {billing && billing.plan !== "free" ? "Manage plan" : "Upgrade"}
             <ChevronRight className="size-4 text-muted-foreground" />
           </Link>
         </Row>
@@ -587,7 +597,7 @@ function AccountTab({
         title="Delete your account?"
         body={
           <>
-            Your account, all chats and settings will be permanently deleted. Any paid plan time left is lost. Type{" "}
+            Your account, all chats and settings will be permanently deleted. Auto-renew is cancelled and any paid plan time left is lost. Type{" "}
             <span className="font-medium text-card-foreground">{user.email}</span> to confirm.
           </>
         }

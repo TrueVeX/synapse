@@ -19,14 +19,22 @@ import {
   type PlansResponse,
 } from "@/lib/api";
 
-type RazorpayResponse = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
+type RazorpayResponse = {
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  razorpay_order_id?: string;
+  razorpay_subscription_id?: string;
+};
 type RazorpayOptions = {
   key: string;
-  amount: number;
-  currency: string;
   name: string;
   description: string;
-  order_id: string;
+  // One-time payment
+  amount?: number;
+  currency?: string;
+  order_id?: string;
+  // Auto-pay subscription
+  subscription_id?: string;
   prefill?: { name?: string; email?: string };
   theme?: { color?: string; backdrop_color?: string };
   handler: (response: RazorpayResponse) => void;
@@ -40,8 +48,10 @@ declare global {
 }
 
 type Checkout = {
+  mode: "order" | "subscription";
   key_id: string;
-  order_id: string;
+  order_id?: string;
+  subscription_id?: string;
   amount: number;
   currency: string;
   description: string;
@@ -80,11 +90,18 @@ const FAQ = [
     q: "What if an answer fails or I stop it?",
     a: "If you stop an answer before any words appear, or it fails without writing anything, the credits are returned automatically.",
   },
-  {
+];
+
+const BILLING_FAQ = {
+  autopay: {
+    q: "How does billing work?",
+    a: "Pro and Max renew automatically through Razorpay: approve UPI AutoPay or a card mandate once, and you're charged every month or year. Cancel any time from this page; your plan stays active until the end of the period you paid for, and you won't be charged again.",
+  },
+  oneTime: {
     q: "How does billing work?",
     a: "You pay once for a month or a year through Razorpay (UPI, cards, netbanking and wallets). Your plan stays active until the end of that period; buy again to renew or switch plans. Nothing is charged automatically.",
   },
-];
+};
 
 export default function PricingPage() {
   const router = useRouter();
@@ -95,6 +112,8 @@ export default function PricingPage() {
   const [busyPlanId, setBusyPlanId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const refreshAccount = useCallback(async () => {
     if (!getToken()) return;
@@ -128,8 +147,14 @@ export default function PricingPage() {
     return plans.plans.map((plan) => {
       const current = status?.plan === plan.id;
       const isFree = plan.id === "free";
+      const autopay = status?.autopay;
       let buttonText = isFree ? "Start for free" : `Get ${plan.name}`;
       if (current) buttonText = isFree ? "Your current plan" : `Renew ${plan.name}`;
+      if (!isFree && autopay && !autopay.cancel_at_period_end) {
+        // Already auto-paying: the same plan offers the other billing period as a switch.
+        buttonText = autopay.plan === plan.id ? "Switch billing" : `Switch to ${plan.name}`;
+      }
+      if (!isFree && current && autopay?.cancel_at_period_end) buttonText = `Restart ${plan.name}`;
       if (isFree && status && status.plan !== "free") buttonText = "Included";
       return {
         id: plan.id,
@@ -144,6 +169,8 @@ export default function PricingPage() {
         href: isFree ? (signedIn ? "/" : "/signup") : undefined,
         isPopular: plan.id === "pro",
         disabled: isFree && signedIn,
+        currentBilling:
+          autopay && autopay.plan === plan.id && !autopay.cancel_at_period_end ? autopay.billing : undefined,
       };
     });
   }, [plans, status, signedIn]);
@@ -169,11 +196,11 @@ export default function PricingPage() {
 
       const checkout = new window.Razorpay({
         key: order.key_id,
-        amount: order.amount,
-        currency: order.currency,
         name: "SYNAPSE",
         description: order.description,
-        order_id: order.order_id,
+        ...(order.mode === "subscription"
+          ? { subscription_id: order.subscription_id }
+          : { amount: order.amount, currency: order.currency, order_id: order.order_id }),
         prefill: order.prefill,
         theme: { color: "#d97757", backdrop_color: "rgba(20, 20, 19, 0.75)" },
         handler: async (response) => {
@@ -186,7 +213,9 @@ export default function PricingPage() {
             refreshAccount();
             setNotice({
               kind: "success",
-              text: `Welcome to SYNAPSE ${updated.plan_name}! ${updated.credits.limit.toLocaleString("en-IN")} credits are ready to use.`,
+              text: `Welcome to SYNAPSE ${updated.plan_name}! ${updated.credits.limit.toLocaleString("en-IN")} credits are ready to use.${
+                updated.autopay ? " Your plan renews automatically; cancel any time." : ""
+              }`,
             });
             confetti({ particleCount: 120, spread: 80, origin: { y: 0.3 }, colors: ["#d97757", "#9c87f5", "#faf9f5"], disableForReducedMotion: true });
           } catch (error) {
@@ -214,6 +243,23 @@ export default function PricingPage() {
       }
       setNotice({ kind: "error", text: error instanceof Error ? error.message : "Couldn't start the payment." });
       setBusyPlanId(null);
+    }
+  }
+
+  async function cancelAutopay() {
+    setCancelling(true);
+    try {
+      const updated = await api<BillingStatus>("/api/billing/cancel", { method: "POST" });
+      setStatus(updated);
+      setConfirmCancel(false);
+      setNotice({
+        kind: "success",
+        text: `Auto-renew is off. You keep SYNAPSE ${updated.plan_name} until ${formatDate(updated.expires_at!)} and won't be charged again.`,
+      });
+    } catch (error) {
+      setNotice({ kind: "error", text: error instanceof Error ? error.message : "Couldn't cancel auto-renew." });
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -293,8 +339,45 @@ export default function PricingPage() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {status.plan === "free"
                     ? "Free forever. Upgrade any time for more credits and Deep research."
-                    : `${status.billing === "annual" ? "Annual" : "Monthly"} plan · active until ${formatDate(status.expires_at!)}`}
+                    : status.autopay && !status.autopay.cancel_at_period_end
+                      ? `${status.billing === "annual" ? "Annual" : "Monthly"} plan · renews automatically on ${formatDate(status.autopay.next_charge_at ?? status.expires_at!)}`
+                      : status.autopay?.cancel_at_period_end
+                        ? `Auto-renew is off · active until ${formatDate(status.expires_at!)}`
+                        : `${status.billing === "annual" ? "Annual" : "Monthly"} plan · active until ${formatDate(status.expires_at!)}`}
                 </p>
+                {status.autopay && !status.autopay.cancel_at_period_end && status.autopay.status === "active" && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                    {confirmCancel ? (
+                      <>
+                        <span className="text-muted-foreground">Stop auto-renew? You keep your plan until the period ends.</span>
+                        <button
+                          type="button"
+                          onClick={cancelAutopay}
+                          disabled={cancelling}
+                          className="h-8 rounded-lg bg-red-600 px-3 font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                        >
+                          {cancelling ? "Cancelling…" : "Yes, cancel"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmCancel(false)}
+                          disabled={cancelling}
+                          className="h-8 rounded-lg border border-border px-3 transition-colors hover:bg-accent"
+                        >
+                          Keep it
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCancel(true)}
+                        className="text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+                      >
+                        Cancel auto-renew
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="w-full sm:w-80">
                 <CreditMeter credits={status.credits} />
@@ -318,6 +401,7 @@ export default function PricingPage() {
             description={"Start free. Upgrade when you need more answers or Deep research.\nAll prices are in Indian Rupees (INR)."}
             onSelect={startCheckout}
             busyPlanId={busyPlanId}
+            autoRenew={Boolean(plans.autopay)}
           />
         )}
 
@@ -366,7 +450,7 @@ export default function PricingPage() {
         <section className="mx-auto max-w-3xl py-10">
           <h2 className="text-center font-serif text-2xl text-card-foreground">Questions</h2>
           <div className="mt-5 divide-y divide-border rounded-2xl border border-border">
-            {FAQ.map((item) => (
+            {[...FAQ, plans?.autopay ? BILLING_FAQ.autopay : BILLING_FAQ.oneTime].map((item) => (
               <details key={item.q} className="group px-5 py-4">
                 <summary className="cursor-pointer list-none font-medium text-card-foreground marker:hidden">
                   <span className="flex items-center justify-between gap-4">

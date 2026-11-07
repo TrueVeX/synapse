@@ -377,9 +377,26 @@ def initialize_database():
             )
             """
         )
+        # Razorpay auto-pay subscriptions (one row per subscription started).
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS razorpay_subscriptions (
+                subscription_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                plan TEXT NOT NULL,
+                billing TEXT NOT NULL,
+                status TEXT NOT NULL,
+                cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+                current_end TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         if USE_POSTGRES:
-            # Keep the table closed to Supabase's public Data API, like the others.
+            # Keep these tables closed to Supabase's public Data API, like the others.
             connection.execute("ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY")
+            connection.execute("ALTER TABLE razorpay_subscriptions ENABLE ROW LEVEL SECURITY")
         connection.commit()
 
 
@@ -2039,6 +2056,20 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "").strip()
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "").strip()
 
+# Auto-pay: Razorpay plan IDs. A plan/billing pair with an ID is sold as an
+# auto-renewing subscription; without one it falls back to a one-time order.
+RAZORPAY_PLAN_IDS = {
+    (plan, billing): os.getenv(f"RAZORPAY_PLAN_{plan.upper()}_{billing.upper()}", "").strip()
+    for plan in ("pro", "max")
+    for billing in ("monthly", "annual")
+}
+
+# How many renewals a subscription allows before it ends (Razorpay needs a number).
+SUBSCRIPTION_CYCLES = {"monthly": 60, "annual": 5}
+
+# Statuses in which Razorpay will keep charging the customer.
+RENEWING_STATUSES = ("authenticated", "active", "pending")
+
 
 class CheckoutRequest(BaseModel):
     plan: str = Field(min_length=1, max_length=20)
@@ -2046,9 +2077,189 @@ class CheckoutRequest(BaseModel):
 
 
 class VerifyPaymentRequest(BaseModel):
-    razorpay_order_id: str = Field(min_length=1, max_length=100)
     razorpay_payment_id: str = Field(min_length=1, max_length=100)
     razorpay_signature: str = Field(min_length=1, max_length=200)
+    # One of these two: a one-time order, or an auto-pay subscription.
+    razorpay_order_id: Optional[str] = Field(default=None, max_length=100)
+    razorpay_subscription_id: Optional[str] = Field(default=None, max_length=100)
+
+
+def razorpay_call(method: str, path: str, payload: Optional[dict] = None):
+    """Calls the Razorpay API; raises a friendly 502 if it fails."""
+
+    try:
+        response = requests.request(
+            method,
+            f"https://api.razorpay.com/v1{path}",
+            auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET),
+            json=payload,
+            timeout=20,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Could not reach Razorpay. Please try again.") from exc
+
+    if not response.ok:
+        try:
+            message = response.json().get("error", {}).get("description")
+        except ValueError:
+            message = None
+        raise HTTPException(
+            status_code=502,
+            detail=f"Razorpay couldn't complete that{': ' + message if message else '.'}",
+        )
+
+    return response.json()
+
+
+def renewing_subscription(user_id: int):
+    """The user's auto-pay subscription that Razorpay is still charging, if any."""
+
+    with get_connection() as connection:
+        return connection.execute(
+            f"""
+            SELECT subscription_id, plan, billing, status,
+                   cancel_at_period_end, current_end
+            FROM razorpay_subscriptions
+            WHERE user_id = ? AND status IN ({", ".join("?" for _ in RENEWING_STATUSES)})
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            (user_id, *RENEWING_STATUSES),
+        ).fetchone()
+
+
+def unix_to_iso(value):
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat() if value else None
+    except (TypeError, ValueError):
+        return None
+
+
+def record_subscription_charge(subscription_id: str, payment_id: str, amount: int, current_end=None):
+    """Applies one paid auto-pay charge (the first or a renewal).
+
+    Safe to call twice for the same payment (verify + webhook). Returns the
+    user id, or None if the subscription is unknown.
+    """
+
+    now = datetime.now(timezone.utc)
+
+    with get_connection() as connection:
+        sub = connection.execute(
+            "SELECT user_id, plan, billing FROM razorpay_subscriptions WHERE subscription_id = ?",
+            (subscription_id,),
+        ).fetchone()
+
+        if not sub:
+            return None
+
+        # The payment id is unique, so a second call for the same charge does nothing.
+        inserted = connection.execute(
+            """
+            INSERT INTO payments
+            (order_id, user_id, plan, billing, amount, currency, status, payment_id, created_at, paid_at)
+            VALUES (?, ?, ?, ?, ?, 'INR', 'paid', ?, ?, ?)
+            ON CONFLICT (order_id) DO NOTHING
+            """,
+            (
+                f"sub:{payment_id}",
+                sub["user_id"],
+                sub["plan"],
+                sub["billing"],
+                int(amount or PLANS[sub["plan"]]["prices"][sub["billing"]]),
+                payment_id,
+                now.isoformat(),
+                now.isoformat(),
+            ),
+        ).rowcount
+
+        # Access lasts until Razorpay's next charge date, plus a day of grace
+        # so a renewal that arrives a little late doesn't interrupt anyone.
+        period_end = parse_time(current_end) if current_end else now + timedelta(days=BILLING_DAYS[sub["billing"]])
+        expires = period_end + timedelta(days=1)
+
+        connection.execute(
+            """
+            UPDATE razorpay_subscriptions
+            SET status = 'active', current_end = ?, updated_at = ?
+            WHERE subscription_id = ?
+            """,
+            (period_end.isoformat(), now.isoformat(), subscription_id),
+        )
+
+        if inserted == 1:
+            current = connection.execute(
+                "SELECT plan, billing, started_at, expires_at FROM subscriptions WHERE user_id = ?",
+                (sub["user_id"],),
+            ).fetchone()
+            renewal = (
+                current
+                and current["plan"] == sub["plan"]
+                and current["billing"] == sub["billing"]
+                and parse_time(current["expires_at"]) > now
+            )
+            # A renewal keeps the same start (credit months continue);
+            # a new or changed plan starts fresh today.
+            started = current["started_at"] if renewal else now.isoformat()
+            new_expiry = max(parse_time(current["expires_at"]), expires) if renewal else expires
+
+            connection.execute(
+                """
+                INSERT INTO subscriptions
+                (user_id, plan, billing, started_at, expires_at, last_order_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    plan = excluded.plan,
+                    billing = excluded.billing,
+                    started_at = excluded.started_at,
+                    expires_at = excluded.expires_at,
+                    last_order_id = excluded.last_order_id,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    sub["user_id"],
+                    sub["plan"],
+                    sub["billing"],
+                    started,
+                    new_expiry.isoformat(),
+                    subscription_id,
+                    now.isoformat(),
+                ),
+            )
+
+        # Any older auto-pay (e.g. after switching Pro -> Max) must stop charging.
+        older = connection.execute(
+            f"""
+            SELECT subscription_id FROM razorpay_subscriptions
+            WHERE user_id = ? AND subscription_id <> ?
+              AND status IN ({", ".join("?" for _ in RENEWING_STATUSES)})
+            """,
+            (sub["user_id"], subscription_id, *RENEWING_STATUSES),
+        ).fetchall()
+
+    for row in older:
+        try:
+            razorpay_call("POST", f"/subscriptions/{row['subscription_id']}/cancel", {"cancel_at_cycle_end": 0})
+        except HTTPException:
+            traceback.print_exc()
+        set_subscription_status(row["subscription_id"], "cancelled")
+
+    return sub["user_id"]
+
+
+def set_subscription_status(subscription_id: str, status: str, current_end=None, cancel_at_period_end=None):
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE razorpay_subscriptions
+            SET status = ?,
+                current_end = COALESCE(CAST(? AS TEXT), current_end),
+                cancel_at_period_end = COALESCE(CAST(? AS INTEGER), cancel_at_period_end),
+                updated_at = ?
+            WHERE subscription_id = ?
+            """,
+            (status, current_end, cancel_at_period_end, utc_now(), subscription_id),
+        )
 
 
 def parse_time(value: str):
@@ -2114,11 +2325,25 @@ def billing_status(user_id: int):
     plan = PLANS[plan_key]
     used = credits_used(user_id, window_key)
 
+    autopay = renewing_subscription(user_id)
+
     return {
         "plan": plan_key,
         "plan_name": plan["name"],
         "billing": subscription["billing"] if subscription else None,
         "expires_at": subscription["expires_at"] if subscription else None,
+        # Auto-pay details when the plan renews automatically.
+        "autopay": (
+            {
+                "plan": autopay["plan"],
+                "billing": autopay["billing"],
+                "status": autopay["status"],
+                "cancel_at_period_end": bool(autopay["cancel_at_period_end"]),
+                "next_charge_at": autopay["current_end"],
+            }
+            if autopay
+            else None
+        ),
         "credits": {
             "used": used,
             "limit": plan["credits"],
@@ -2281,6 +2506,7 @@ def list_plans():
     return {
         "currency": "INR",
         "payments_enabled": bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET),
+        "autopay": bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET and all(RAZORPAY_PLAN_IDS.values())),
         "annual_discount_percent": 20,
         "plans": [
             {
@@ -2327,7 +2553,60 @@ def create_checkout(
         )
 
     amount = PLANS[plan_key]["prices"][billing]
+    description = f"SYNAPSE {PLANS[plan_key]['name']} · {billing.capitalize()}"
+    plan_id = RAZORPAY_PLAN_IDS.get((plan_key, billing))
 
+    # ---- Auto-pay: an auto-renewing Razorpay subscription ------------------
+    if plan_id:
+        current = renewing_subscription(user["id"])
+        if (
+            current
+            and current["plan"] == plan_key
+            and current["billing"] == billing
+            and current["status"] == "active"
+            and not current["cancel_at_period_end"]
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"You're already subscribed to {PLANS[plan_key]['name']} ({billing}). It renews automatically.",
+            )
+
+        subscription = razorpay_call(
+            "POST",
+            "/subscriptions",
+            {
+                "plan_id": plan_id,
+                "total_count": SUBSCRIPTION_CYCLES[billing],
+                "quantity": 1,
+                "customer_notify": 1,
+                "notes": {"user_id": str(user["id"]), "plan": plan_key, "billing": billing},
+            },
+        )
+
+        now = utc_now()
+        with get_connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO razorpay_subscriptions
+                (subscription_id, user_id, plan, billing, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'created', ?, ?)
+                """,
+                (subscription["id"], user["id"], plan_key, billing, now, now),
+            )
+
+        return {
+            "mode": "subscription",
+            "key_id": RAZORPAY_KEY_ID,
+            "subscription_id": subscription["id"],
+            "amount": amount,
+            "currency": "INR",
+            "plan": plan_key,
+            "billing": billing,
+            "description": f"{description} · renews automatically",
+            "prefill": {"name": user["name"], "email": user["email"]},
+        }
+
+    # ---- One-time payment for 30 / 365 days ---------------------------------
     try:
         response = requests.post(
             "https://api.razorpay.com/v1/orders",
@@ -2366,13 +2645,14 @@ def create_checkout(
         )
 
     return {
+        "mode": "order",
         "key_id": RAZORPAY_KEY_ID,
         "order_id": order["id"],
         "amount": amount,
         "currency": "INR",
         "plan": plan_key,
         "billing": billing,
-        "description": f"SYNAPSE {PLANS[plan_key]['name']} · {billing.capitalize()}",
+        "description": description,
         "prefill": {"name": user["name"], "email": user["email"]},
     }
 
@@ -2383,6 +2663,44 @@ def verify_payment(
     authorization: Optional[str] = Header(default=None),
 ):
     user = require_user(authorization)
+
+    # ---- Auto-pay subscription: the first payment ---------------------------
+    if payload.razorpay_subscription_id:
+        with get_connection() as connection:
+            sub = connection.execute(
+                "SELECT subscription_id FROM razorpay_subscriptions WHERE subscription_id = ? AND user_id = ?",
+                (payload.razorpay_subscription_id, user["id"]),
+            ).fetchone()
+
+        if not sub or not RAZORPAY_KEY_SECRET:
+            raise HTTPException(status_code=404, detail="Subscription not found.")
+
+        # Razorpay signs "payment_id|subscription_id" with our secret.
+        expected = hmac.new(
+            RAZORPAY_KEY_SECRET.encode(),
+            f"{payload.razorpay_payment_id}|{sub['subscription_id']}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected, payload.razorpay_signature):
+            raise HTTPException(status_code=400, detail="Payment could not be verified.")
+
+        # Ask Razorpay for the next charge date and the amount actually paid.
+        current_end, amount = None, None
+        try:
+            details = razorpay_call("GET", f"/subscriptions/{sub['subscription_id']}")
+            current_end = unix_to_iso(details.get("current_end"))
+            payment = razorpay_call("GET", f"/payments/{payload.razorpay_payment_id}")
+            amount = payment.get("amount")
+        except HTTPException:
+            traceback.print_exc()
+
+        record_subscription_charge(sub["subscription_id"], payload.razorpay_payment_id, amount, current_end)
+        return billing_status(user["id"])
+
+    # ---- One-time order ------------------------------------------------------
+    if not payload.razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Payment could not be verified.")
 
     with get_connection() as connection:
         payment = connection.execute(
@@ -2426,12 +2744,66 @@ async def razorpay_webhook(request: Request):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid body.")
 
-    if event.get("event") in ("payment.captured", "order.paid"):
-        entity = event.get("payload", {}).get("payment", {}).get("entity", {})
-        if entity.get("order_id") and entity.get("id"):
-            activate_payment(entity["order_id"], entity["id"])
+    name = event.get("event", "")
+    payload = event.get("payload", {})
+    payment = payload.get("payment", {}).get("entity", {})
+    subscription = payload.get("subscription", {}).get("entity", {})
+
+    if name in ("payment.captured", "order.paid"):
+        if payment.get("order_id") and payment.get("id"):
+            activate_payment(payment["order_id"], payment["id"])
+
+    elif name == "subscription.charged" and subscription.get("id") and payment.get("id"):
+        # Every successful auto-pay charge, including monthly/yearly renewals.
+        record_subscription_charge(
+            subscription["id"],
+            payment["id"],
+            payment.get("amount"),
+            unix_to_iso(subscription.get("current_end")),
+        )
+
+    elif name.startswith("subscription.") and subscription.get("id"):
+        # authenticated / activated / pending / halted / cancelled / completed...
+        # Access already paid for continues until it runs out.
+        status = name.split(".", 1)[1]
+        set_subscription_status(
+            subscription["id"],
+            subscription.get("status") or status,
+            unix_to_iso(subscription.get("current_end")),
+        )
 
     return {"ok": True}
+
+
+@app.post("/api/billing/cancel")
+def cancel_autopay(
+    authorization: Optional[str] = Header(default=None),
+):
+    """Stops auto-pay. The plan stays active until the end of the paid period."""
+
+    user = require_user(authorization)
+    current = renewing_subscription(user["id"])
+
+    if not current:
+        raise HTTPException(status_code=404, detail="You don't have an auto-renewing plan.")
+
+    if current["status"] == "active":
+        # Razorpay stops at the end of the current period (no further charges).
+        result = razorpay_call(
+            "POST", f"/subscriptions/{current['subscription_id']}/cancel", {"cancel_at_cycle_end": 1}
+        )
+        set_subscription_status(
+            current["subscription_id"],
+            result.get("status") or "active",
+            unix_to_iso(result.get("current_end")),
+            1,
+        )
+    else:
+        # Never paid (or still waiting for approval): cancel straight away.
+        razorpay_call("POST", f"/subscriptions/{current['subscription_id']}/cancel", {"cancel_at_cycle_end": 0})
+        set_subscription_status(current["subscription_id"], "cancelled")
+
+    return billing_status(user["id"])
 
 
 @app.get("/api/billing/payments")
@@ -2702,6 +3074,18 @@ def delete_account(
         raise HTTPException(status_code=400, detail="That email doesn't match your account.")
 
     user_id = user["id"]
+
+    # Stop any auto-pay first so Razorpay never charges a deleted account.
+    autopay = renewing_subscription(user_id)
+    if autopay:
+        try:
+            razorpay_call("POST", f"/subscriptions/{autopay['subscription_id']}/cancel", {"cancel_at_cycle_end": 0})
+        except HTTPException as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="We couldn't stop your auto-pay with Razorpay, so the account wasn't deleted. Please try again.",
+            ) from exc
+
     with get_connection() as connection:
         connection.execute(
             """
@@ -2710,7 +3094,7 @@ def delete_account(
             """,
             (user_id,),
         )
-        for table in ("conversations", "credit_usage", "subscriptions", "chat_stops", "user_settings"):
+        for table in ("conversations", "credit_usage", "subscriptions", "chat_stops", "user_settings", "razorpay_subscriptions"):
             connection.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         # Payment records are kept for accounting, unlinked from the deleted account.
         connection.execute("UPDATE payments SET user_id = 0 WHERE user_id = ?", (user_id,))

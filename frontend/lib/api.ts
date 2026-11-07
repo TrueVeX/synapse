@@ -41,6 +41,14 @@ export type BillingStatus = {
   plan_name: string;
   billing: "monthly" | "annual" | null;
   expires_at: string | null;
+  /** Set when the plan renews automatically (Razorpay auto-pay). */
+  autopay: {
+    plan: "pro" | "max";
+    billing: "monthly" | "annual";
+    status: string;
+    cancel_at_period_end: boolean;
+    next_charge_at: string | null;
+  } | null;
   credits: CreditInfo;
   costs: { web: number; academic: number; deep: number | null };
   deep_research: boolean;
@@ -63,6 +71,8 @@ export type PlanInfo = {
 export type PlansResponse = {
   currency: "INR";
   payments_enabled: boolean;
+  /** Paid plans renew automatically (Razorpay subscriptions). */
+  autopay?: boolean;
   annual_discount_percent: number;
   plans: PlanInfo[];
 };

@@ -29,6 +29,8 @@ export interface PricingPlan {
   isPopular: boolean;
   /** SYNAPSE: e.g. the plan you already have */
   disabled?: boolean;
+  /** SYNAPSE: the billing period the user is already auto-paying for on this plan */
+  currentBilling?: "monthly" | "annual";
 }
 
 interface PricingProps {
@@ -41,6 +43,8 @@ interface PricingProps {
   busyPlanId?: string | null;
   /** SYNAPSE: start on annual billing */
   defaultAnnual?: boolean;
+  /** SYNAPSE: paid plans renew automatically */
+  autoRenew?: boolean;
 }
 
 const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
@@ -60,6 +64,7 @@ export function Pricing({
   onSelect,
   busyPlanId,
   defaultAnnual = false,
+  autoRenew = false,
 }: PricingProps) {
   const [isMonthly, setIsMonthly] = useState(!defaultAnnual);
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -122,6 +127,8 @@ export function Pricing({
         {plans.map((plan, index) => {
           const billing = isMonthly ? "monthly" : "annual";
           const busy = busyPlanId === plan.id;
+          const isCurrent = plan.currentBilling === billing;
+          const disabled = plan.disabled || isCurrent;
           const buttonClass = cn(
             buttonVariants({
               variant: "outline",
@@ -131,7 +138,7 @@ export function Pricing({
             plan.isPopular
               ? "bg-primary text-primary-foreground"
               : "bg-background text-foreground",
-            plan.disabled && "pointer-events-none opacity-60",
+            disabled && "pointer-events-none opacity-60",
           );
 
           return (
@@ -213,8 +220,8 @@ export function Pricing({
                   {Number(plan.price) === 0
                     ? "free forever"
                     : isMonthly
-                      ? "billed monthly"
-                      : `${plan.yearlyTotal ? inr.format(plan.yearlyTotal) + " " : ""}billed annually`}
+                      ? autoRenew ? "billed monthly · auto-renews, cancel anytime" : "billed monthly"
+                      : `${plan.yearlyTotal ? inr.format(plan.yearlyTotal) + " " : ""}billed annually${autoRenew ? " · auto-renews" : ""}`}
                 </p>
 
                 <ul className="mt-5 gap-2 flex flex-col">
@@ -231,12 +238,12 @@ export function Pricing({
                 {onSelect && !plan.href ? (
                   <button
                     type="button"
-                    disabled={plan.disabled || busy}
+                    disabled={disabled || busy}
                     onClick={() => onSelect(plan, billing)}
                     className={buttonClass}
                   >
                     {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {plan.buttonText}
+                    {isCurrent ? "Current plan" : plan.buttonText}
                   </button>
                 ) : (
                   <Link href={plan.href ?? "/"} className={buttonClass} aria-disabled={plan.disabled}>
