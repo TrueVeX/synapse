@@ -41,6 +41,8 @@ type RazorpayOptions = {
   // Full-page checkout (phones / apps): Razorpay returns to callback_url.
   callback_url?: string;
   redirect?: boolean;
+  /** Show UPI apps when running inside an Android web view (the SYNAPSE app). */
+  webview_intent?: boolean;
   prefill?: { name?: string; email?: string };
   theme?: { color?: string; backdrop_color?: string };
   handler: (response: RazorpayResponse) => void;
@@ -240,6 +242,9 @@ export default function PricingPage() {
         theme: { color: "#d97757", backdrop_color: "rgba(20, 20, 19, 0.75)" },
         // Phones / apps: open Razorpay as a full page and come back afterwards.
         ...(redirect && order.callback_url ? { callback_url: order.callback_url, redirect: true } : {}),
+        // Inside the Android app: show UPI apps (GPay, PhonePe, Paytm...), which
+        // Razorpay hides in app web views unless this is set.
+        ...(inApp ? { webview_intent: true } : {}),
         handler: async (response) => {
           try {
             const updated = await api<BillingStatus>("/api/billing/verify", {
