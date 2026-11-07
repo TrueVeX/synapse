@@ -40,3 +40,9 @@ CLAUDE_HANDOFF.md
 
 # Build logs
 *.log
+
+# Android release signing (keep private, back up safely)
+keystore.properties
+
+# Files uploaded to GitHub Releases
+apps/release-files/

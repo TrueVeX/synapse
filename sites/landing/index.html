@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Introducing SYNAPSE · AI research assistant by HumanForm Studios</title>
+  <meta name="description" content="SYNAPSE is an AI research assistant that searches the live web, reads your files and answers with citations. Use it on the web, or download it for Windows and Android." />
+  <meta name="theme-color" content="#1f1e1d" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Introducing SYNAPSE" />
+  <meta property="og:description" content="An AI research assistant that searches the live web, reads your files and answers with citations. Web, Windows and Android." />
+  <meta property="og:image" content="https://synapse-download.vercel.app/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "SYNAPSE",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "Web, Windows 10+, Android 7.0+",
+      "description": "AI research assistant that searches the live web, reads your files and answers with citations.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+      "author": { "@type": "Organization", "name": "HumanForm Studios" },
+      "creator": { "@type": "Person", "name": "Revoori Ashwath Reddy" }
+    }
+  </script>
+</head>
+<body>
+  <!-- The SYNAPSE mark, reused across the page -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="mark" viewBox="0 0 32 32">
+      <g fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+        <line x1="16" y1="11.6" x2="16" y2="6.4" /><line x1="19.81" y1="13.8" x2="24.31" y2="11.2" /><line x1="19.81" y1="18.2" x2="24.31" y2="20.8" />
+        <line x1="16" y1="20.4" x2="16" y2="25.6" /><line x1="12.19" y1="18.2" x2="7.69" y2="20.8" /><line x1="12.19" y1="13.8" x2="7.69" y2="11.2" />
+        <circle cx="16" cy="3.8" r="2.4" stroke="none" /><circle cx="26.57" cy="9.9" r="1.8" stroke="none" /><circle cx="26.57" cy="22.1" r="2.4" stroke="none" />
+        <circle cx="16" cy="28.2" r="1.8" stroke="none" /><circle cx="5.43" cy="22.1" r="2.4" stroke="none" /><circle cx="5.43" cy="9.9" r="1.8" stroke="none" />
+        <circle cx="16" cy="16" r="3" stroke="none" />
+      </g>
+    </symbol>
+  </svg>
+
+  <a class="skip" href="#main">Skip to main content</a>
+
+  <header class="nav" id="top">
+    <div class="nav__inner">
+      <a class="brand" href="/" aria-label="SYNAPSE home">
+        <svg class="brand__mark" aria-hidden="true"><use href="#mark" /></svg>
+        <span class="brand__word">SYNAPSE</span>
+      </a>
+      <nav class="nav__links" id="nav-links" aria-label="Main">
+        <a href="#research">Research</a>
+        <a href="#modes">Modes</a>
+        <a href="#plans">Plans</a>
+        <a href="#download">Download</a>
+        <a href="https://synapse-docs.vercel.app">Docs</a>
+      </nav>
+      <div class="nav__actions">
+        <a class="btn btn--small btn--primary" href="https://synapse-humanform.vercel.app">Open SYNAPSE</a>
+        <button class="nav__menu" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero: interactive synapse network -->
+    <section class="hero" aria-label="SYNAPSE network animation">
+      <div class="hero__stage">
+        <canvas id="hero-canvas" aria-hidden="true"></canvas>
+        <div class="hero__glow" aria-hidden="true"></div>
+        <svg class="hero__mark" aria-hidden="true"><use href="#mark" /></svg>
+        <p class="hero__hint" aria-hidden="true"><span class="hint-dot"></span> Drag to explore</p>
+      </div>
+    </section>
+
+    <!-- Article header -->
+    <article class="article">
+      <header class="article__head reveal">
+        <p class="eyebrow"><span>Product</span><span aria-hidden="true">·</span><time datetime="2026-11-07">November 7, 2026</time></p>
+        <h1 class="title">Introducing SYNAPSE</h1>
+        <p class="dek">An AI research assistant that reads the web for you, and shows its work.</p>
+        <div class="cta-row">
+          <a class="btn btn--primary" href="https://synapse-humanform.vercel.app">Try SYNAPSE free</a>
+          <a class="btn btn--ghost" href="#download">Download for Windows &amp; Android</a>
+        </div>
+      </header>
+
+      <div class="prose">
+        <p class="update reveal"><strong>Update on November 7, 2026:</strong> SYNAPSE is now available as an app for <a href="#download">Windows and Android</a>, and Pro and Max plans now renew automatically with UPI AutoPay.</p>
+
+        <p class="lede reveal">Today we're introducing <strong>SYNAPSE</strong>, a research assistant built by HumanForm Studios. Ask a question and SYNAPSE searches the live web, reads the most relevant pages and any files you attach, and writes a clear answer with numbered citations, so you can check every claim against the source it came from.</p>
+
+        <p class="reveal">SYNAPSE is designed around one rule: <em>never invent a source</em>. Every answer shows the searches it ran and the pages it read. When a model shares its reasoning, you can open a thinking panel and follow along. When something can't be found, SYNAPSE says so instead of guessing.</p>
+
+        <p class="reveal">SYNAPSE is available today, free, on the web at <a href="https://synapse-humanform.vercel.app">synapse-humanform.vercel.app</a>, and as apps for Windows 10 and 11 and Android 7.0 and later. Pro and Max plans add more credits, Deep research and more files per message.</p>
+      </div>
+
+      <!-- Quick facts strip -->
+      <div class="facts reveal" role="list">
+        <div class="fact" role="listitem"><span class="fact__num" data-count="6">6</span><span class="fact__label">top web sources read for each question</span></div>
+        <div class="fact" role="listitem"><span class="fact__num" data-count="3">3</span><span class="fact__label">research modes, from quick answers to deep investigations</span></div>
+        <div class="fact" role="listitem"><span class="fact__num" data-count="110">110</span><span class="fact__label">free credits every day, no card needed</span></div>
+        <div class="fact" role="listitem"><span class="fact__num" data-count="17">17</span><span class="fact__label">answer languages, or automatic</span></div>
+      </div>
+
+      <!-- Research that shows its work -->
+      <section class="section" id="research" aria-labelledby="research-title">
+        <div class="prose">
+          <h2 id="research-title" class="reveal">Research that shows its work</h2>
+          <p class="reveal">Most AI assistants answer from memory. SYNAPSE answers from the web as it is right now. For every question it writes a search, collects the most relevant pages, and builds its answer from what those pages actually say. Citations appear as small numbered chips; tap one to open the source.</p>
+          <p class="reveal">Follow-up questions keep their context: SYNAPSE remembers the recent messages in a chat and folds your earlier question into short follow-ups like “what about the cost?”, so the search still finds the right pages.</p>
+        </div>
+
+        <figure class="gallery reveal" aria-label="Example conversations">
+          <div class="tabs" role="tablist" aria-label="Example conversations">
+            <button role="tab" aria-selected="true" aria-controls="ex-web" id="tab-web">Web research</button>
+            <button role="tab" aria-selected="false" aria-controls="ex-academic" id="tab-academic" tabindex="-1">Academic</button>
+            <button role="tab" aria-selected="false" aria-controls="ex-deep" id="tab-deep" tabindex="-1">Deep research</button>
+            <button role="tab" aria-selected="false" aria-controls="ex-files" id="tab-files" tabindex="-1">Your files</button>
+          </div>
+
+          <div class="panels">
+            <!-- Web research -->
+            <div class="panel" role="tabpanel" id="ex-web" aria-labelledby="tab-web">
+              <div class="chat">
+                <div class="chat__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chat__title">Solar or wind for a small town</span></div>
+                <div class="chat__body">
+                  <div class="msg msg--user">Compare solar and wind power for a small town.</div>
+                  <div class="msg msg--ai">
+                    <div class="searched"><svg aria-hidden="true"><use href="#mark" /></svg> Searched the web · 6 sources</div>
+                    <div class="thinking">Thinking</div>
+                    <div class="answer">
+                      <p>Both can power a small town; the better choice depends mostly on <strong>local weather, space and budget</strong>.</p>
+                      <ul>
+                        <li><strong>Solar</strong> is easier to install on rooftops and open land, needs little maintenance, and produces most in sunny, dry months. <span class="cite">1</span></li>
+                        <li><strong>Wind</strong> can produce more energy per rupee where winds are strong and steady, and keeps generating at night, but turbines need more space and maintenance. <span class="cite">2</span></li>
+                        <li>Many towns <strong>combine both</strong> with batteries, because sun and wind often peak at different times. <span class="cite">3</span></li>
+                      </ul>
+                      <p class="muted">Next step: check your town's average wind speed and sunshine hours before comparing quotes.</p>
+                      <div class="sources"><span>energy agency report</span><span>wind resource study</span><span>community energy guide</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Academic -->
+            <div class="panel" role="tabpanel" id="ex-academic" aria-labelledby="tab-academic" hidden>
+              <div class="chat">
+                <div class="chat__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chat__title">How vaccines train immunity</span></div>
+                <div class="chat__body">
+                  <div class="msg msg--user">Explain how vaccines train the immune system. Academic style, please.</div>
+                  <div class="msg msg--ai">
+                    <div class="searched"><svg aria-hidden="true"><use href="#mark" /></svg> Searched the web · 6 sources · Academic</div>
+                    <div class="thinking">Thinking</div>
+                    <div class="answer">
+                      <h4>Definition</h4>
+                      <p>A vaccine exposes the immune system to an <strong>antigen</strong> (a harmless part or version of a pathogen) so it can prepare a response without the person getting the disease. <span class="cite">1</span></p>
+                      <h4>Mechanism</h4>
+                      <ol>
+                        <li>Antigen-presenting cells show the antigen to <strong>T cells</strong>. <span class="cite">2</span></li>
+                        <li><strong>B cells</strong> produce antibodies that match it.</li>
+                        <li>Long-lived <strong>memory cells</strong> remain, enabling a faster, stronger response on later exposure. <span class="cite">3</span></li>
+                      </ol>
+                      <p class="muted">Evidence vs. interpretation: the mechanism above is well established; how long protection lasts varies by vaccine and is still studied.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Deep research -->
+            <div class="panel" role="tabpanel" id="ex-deep" aria-labelledby="tab-deep" hidden>
+              <div class="chat">
+                <div class="chat__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chat__title">AI in drug discovery</span></div>
+                <div class="chat__body">
+                  <div class="msg msg--user">How is AI being used in drug discovery right now? Go deep.</div>
+                  <div class="msg msg--ai">
+                    <div class="searched"><svg aria-hidden="true"><use href="#mark" /></svg> Advanced search · 6 sources · Deep research</div>
+                    <div class="thinking">Thinking</div>
+                    <div class="answer">
+                      <p>AI is used across the pipeline, with the strongest evidence in the <strong>early stages</strong>:</p>
+                      <table>
+                        <thead><tr><th>Stage</th><th>How AI helps</th><th>Maturity</th></tr></thead>
+                        <tbody>
+                          <tr><td>Target discovery</td><td>Finds links between genes, proteins and disease in large datasets</td><td>Established <span class="cite">1</span></td></tr>
+                          <tr><td>Structure prediction</td><td>Predicts protein shapes to guide molecule design</td><td>Widely used <span class="cite">2</span></td></tr>
+                          <tr><td>Clinical trials</td><td>Helps select sites and patients</td><td>Emerging <span class="cite">3</span></td></tr>
+                        </tbody>
+                      </table>
+                      <p class="muted">Uncertainty: few AI-designed drugs have completed late-stage trials, so overall impact on approval rates is not yet clear.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Files -->
+            <div class="panel" role="tabpanel" id="ex-files" aria-labelledby="tab-files" hidden>
+              <div class="chat">
+                <div class="chat__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chat__title">Summarize a report</span></div>
+                <div class="chat__body">
+                  <div class="msg msg--user"><span class="file-chip">quarterly-report.pdf</span>Summarize the attached report in five key points.</div>
+                  <div class="msg msg--ai">
+                    <div class="searched"><svg aria-hidden="true"><use href="#mark" /></svg> Read 1 file · Searched the web · 6 sources</div>
+                    <div class="thinking">Thinking</div>
+                    <div class="answer">
+                      <ol>
+                        <li><strong>Revenue</strong> grew compared with the previous quarter, led by the largest product line.</li>
+                        <li><strong>Costs</strong> rose more slowly than revenue, improving margins.</li>
+                        <li>The report flags <strong>two risks</strong>: supplier delays and currency changes.</li>
+                        <li><strong>Hiring</strong> is planned mainly for support and sales.</li>
+                        <li>The outlook section expects <strong>steady growth</strong> next quarter.</li>
+                      </ol>
+                      <p class="muted">SYNAPSE reads PDFs, Word documents, text, Markdown, CSV and JSON files, and images.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <figcaption>Illustrative examples. Real answers cite the specific pages SYNAPSE read for your question.</figcaption>
+        </figure>
+      </section>
+
+      <blockquote class="pullquote reveal">
+        <p>“Never fabricate citations.”</p>
+        <footer>The first instruction SYNAPSE is given, before every answer</footer>
+      </blockquote>
+
+      <!-- How it works -->
+      <section class="section" aria-labelledby="loop-title">
+        <div class="prose">
+          <h2 id="loop-title" class="reveal">How SYNAPSE answers a question</h2>
+          <p class="reveal">Each answer follows the same four steps, and you can watch them happen: the search appears first, then the sources, then the answer streams in word by word. You can stop an answer at any time, and retry it with one tap.</p>
+        </div>
+        <ol class="loop reveal">
+          <li class="loop__step"><span class="loop__num">01</span><h3>Search</h3><p>SYNAPSE turns your question, plus the context of your chat, into a web search.</p></li>
+          <li class="loop__step"><span class="loop__num">02</span><h3>Read</h3><p>It collects the six most relevant pages and reads any files or images you attached.</p></li>
+          <li class="loop__step"><span class="loop__num">03</span><h3>Reason</h3><p>The model works through the evidence. If it shares its reasoning, you can open it.</p></li>
+          <li class="loop__step"><span class="loop__num">04</span><h3>Cite</h3><p>The answer streams in with numbered citations that link straight to each source.</p></li>
+        </ol>
+      </section>
+
+      <!-- Modes -->
+      <section class="section" id="modes" aria-labelledby="modes-title">
+        <div class="prose">
+          <h2 id="modes-title" class="reveal">Three ways to research</h2>
+          <p class="reveal">Choose a mode from the menu next to the message box, or turn on extended thinking. Each answer uses credits; if an answer fails, or you stop it before any words appear, the credits come back automatically.</p>
+        </div>
+        <div class="cards cards--3">
+          <div class="card reveal">
+            <div class="card__top"><span class="card__icon">⌕</span><span class="badge">All plans</span></div>
+            <h3>Web research</h3>
+            <p>Fast, focused answers with live sources. The everyday mode for questions, comparisons and explanations.</p>
+            <p class="card__cost"><strong>1 credit</strong> per answer</p>
+          </div>
+          <div class="card reveal">
+            <div class="card__top"><span class="card__icon">§</span><span class="badge">All plans</span></div>
+            <h3>Academic</h3>
+            <p>A formal, evidence-focused style that defines key terms and separates evidence from interpretation.</p>
+            <p class="card__cost"><strong>1 credit</strong> per answer</p>
+          </div>
+          <div class="card card--accent reveal">
+            <div class="card__top"><span class="card__icon">◎</span><span class="badge badge--accent">Pro &amp; Max</span></div>
+            <h3>Deep research</h3>
+            <p>An advanced search and a detailed, structured investigation that compares evidence and explains uncertainty.</p>
+            <p class="card__cost"><strong>3 credits</strong> on Pro · <strong>2</strong> on Max</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Personal -->
+      <section class="section" aria-labelledby="personal-title">
+        <div class="split">
+          <div class="prose prose--flush">
+            <h2 id="personal-title" class="reveal">Made personal</h2>
+            <p class="reveal">Tell SYNAPSE about yourself and how you like answers written, and it applies that to every new answer. Pick a response style (concise, detailed, formal or friendly), choose one of 17 answer languages, including Hindi, Telugu, Tamil, Kannada, Malayalam, Marathi and Bengali, and switch between light and dark themes.</p>
+            <p class="reveal">Your personalization follows your account to every device, including the Windows and Android apps; the theme is saved on each device. You can export all your chats, or delete them, at any time.</p>
+          </div>
+          <div class="settings-mock reveal" aria-hidden="true">
+            <div class="settings-mock__head">Settings</div>
+            <div class="settings-mock__row"><span>Response language</span><span class="pill">Telugu</span></div>
+            <div class="settings-mock__row"><span>Response style</span><span class="pill pill--accent">Concise</span></div>
+            <div class="settings-mock__row"><span>Default mode</span><span class="pill">Web research</span></div>
+            <div class="settings-mock__row"><span>Show thinking</span><span class="switch"><span></span></span></div>
+            <div class="settings-mock__note">“I'm a computer science student who builds AI apps.”</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Files -->
+      <section class="section" aria-labelledby="files-title">
+        <div class="prose">
+          <h2 id="files-title" class="reveal">Bring your own files</h2>
+          <p class="reveal">Attach documents and images to any message, or paste long text, and SYNAPSE reads them alongside the web. It works with <strong>PDF, Word (DOCX), TXT, Markdown, CSV and JSON</strong> files and <strong>PNG, JPG, WEBP and GIF</strong> images. Free accounts attach one file per message, Pro five, and Max ten. File contents are read for that answer and not stored; only the file name is kept with your message.</p>
+        </div>
+      </section>
+
+      <!-- Download -->
+      <section class="section section--wide" id="download" aria-labelledby="download-title">
+        <div class="prose">
+          <h2 id="download-title" class="reveal">Use SYNAPSE everywhere</h2>
+          <p class="reveal">Start on the web, then take SYNAPSE with you. The apps open the live SYNAPSE service, so they always have the newest features without updates, and your chats and plan follow you everywhere.</p>
+        </div>
+
+        <div class="downloads">
+          <div class="dl reveal" data-platform="windows">
+            <span class="dl__recommended">Recommended for this device</span>
+            <div class="dl__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></svg>
+            </div>
+            <h3>Windows</h3>
+            <p class="dl__meta">Windows 10 and 11 · 64-bit · version 1.0.0</p>
+            <a class="btn btn--primary btn--block" href="https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE-Setup.exe">Download installer <span class="size">116 MB</span></a>
+            <a class="btn btn--ghost btn--block" href="https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE-Portable.exe">Portable version <span class="size">105 MB</span></a>
+            <details class="dl__help">
+              <summary>Installing on Windows</summary>
+              <ol>
+                <li>Open the downloaded <code>SYNAPSE-Setup.exe</code>.</li>
+                <li>If “Windows protected your PC” appears, choose <strong>More info → Run anyway</strong>. The app isn't code-signed yet, so Windows doesn't recognise it.</li>
+                <li>Pick an install folder, finish, and open SYNAPSE from the Start menu.</li>
+              </ol>
+              <p>The portable version runs without installing; keep it anywhere, such as on a USB drive.</p>
+            </details>
+            <p class="checksum">SHA-256 <code data-sha="5dd8af81e2c975668c4a43af3a7ae1ad80866933ea60fd7b0e8a82b0cdc61aef">5dd8af81e2c975668c4a43af3a7ae1ad80866933ea60fd7b0e8a82b0cdc61aef</code> <button type="button" class="copy" data-copy="5dd8af81e2c975668c4a43af3a7ae1ad80866933ea60fd7b0e8a82b0cdc61aef">Copy</button></p>
+          </div>
+
+          <div class="dl reveal" data-platform="android">
+            <span class="dl__recommended">Recommended for this device</span>
+            <div class="dl__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+            </div>
+            <h3>Android</h3>
+            <p class="dl__meta">Android 7.0 and later · version 1.0.0</p>
+            <a class="btn btn--primary btn--block" href="https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE.apk">Download APK <span class="size" data-apk-size>3.6 MB</span></a>
+            <details class="dl__help">
+              <summary>Installing on Android</summary>
+              <ol>
+                <li>Open the downloaded <code>SYNAPSE.apk</code> from your notifications or the Files app.</li>
+                <li>If asked, allow your browser or Files app to <strong>install unknown apps</strong>, then go back.</li>
+                <li>Tap <strong>Install</strong>. If Play Protect asks, choose <strong>More details → Install anyway</strong>.</li>
+              </ol>
+              <p>Sign in with your email and password. UPI payments open GPay, PhonePe or Paytm directly.</p>
+            </details>
+            <p class="checksum">SHA-256 <code data-sha="e0cea352740a9757239def439111b76100086ebb75bfb35366affc23edbcbc68">e0cea352740a9757239def439111b76100086ebb75bfb35366affc23edbcbc68</code> <button type="button" class="copy" data-copy="e0cea352740a9757239def439111b76100086ebb75bfb35366affc23edbcbc68">Copy</button></p>
+          </div>
+
+          <div class="dl reveal" data-platform="web">
+            <span class="dl__recommended">Recommended for this device</span>
+            <div class="dl__icon dl__icon--mark" aria-hidden="true"><svg><use href="#mark" /></svg></div>
+            <h3>Web</h3>
+            <p class="dl__meta">Any modern browser · always up to date</p>
+            <a class="btn btn--primary btn--block" href="https://synapse-humanform.vercel.app">Open SYNAPSE</a>
+            <a class="btn btn--ghost btn--block" href="https://synapse-humanform.vercel.app/signup">Create a free account</a>
+            <details class="dl__help">
+              <summary>Add it to your home screen</summary>
+              <p>On Android Chrome, open the menu and choose <strong>Add to Home screen</strong>. On iPhone Safari, tap <strong>Share → Add to Home Screen</strong>. SYNAPSE then opens like an app.</p>
+            </details>
+            <p class="checksum">Sign in with email or Google</p>
+          </div>
+        </div>
+        <p class="downloads__note reveal">Downloads are hosted on <a href="https://github.com/TrueVeX/synapse/releases">GitHub Releases</a>. Check a file's SHA-256 fingerprint to confirm it hasn't been changed.</p>
+      </section>
+
+      <!-- Plans -->
+      <section class="section" id="plans" aria-labelledby="plans-title">
+        <div class="prose">
+          <h2 id="plans-title" class="reveal">Start free. Upgrade when you need more.</h2>
+          <p class="reveal">Every account starts on Free. Pro and Max add monthly credits, Deep research and more files per message, and renew automatically through Razorpay with UPI AutoPay or a card. Cancel any time and keep your plan until the end of the period you paid for. Prices are in Indian rupees.</p>
+        </div>
+
+        <div class="billing-toggle reveal" role="radiogroup" aria-label="Billing period">
+          <button type="button" role="radio" aria-checked="true" data-billing="monthly">Monthly</button>
+          <button type="button" role="radio" aria-checked="false" data-billing="yearly">Yearly <span>save 20%</span></button>
+        </div>
+
+        <div class="cards cards--3 plans">
+          <div class="card plan reveal">
+            <h3>Free</h3>
+            <p class="plan__price"><span>₹0</span></p>
+            <p class="plan__note">free forever</p>
+            <ul>
+              <li>110 credits every day</li>
+              <li>Web research and Academic modes</li>
+              <li>Live sources with citations</li>
+              <li>1 file per message</li>
+            </ul>
+            <a class="btn btn--ghost btn--block" href="https://synapse-humanform.vercel.app/signup">Start for free</a>
+          </div>
+          <div class="card plan plan--featured reveal">
+            <span class="plan__badge">Most popular</span>
+            <h3>Pro</h3>
+            <p class="plan__price"><span data-monthly="₹499" data-yearly="₹399">₹499</span><small>/ month</small></p>
+            <p class="plan__note" data-monthly="billed monthly" data-yearly="₹4,788 billed yearly">billed monthly</p>
+            <ul>
+              <li>600 credits every month</li>
+              <li>Deep research (3 credits)</li>
+              <li>Extended thinking</li>
+              <li>5 files per message</li>
+            </ul>
+            <a class="btn btn--primary btn--block" href="https://synapse-humanform.vercel.app/pricing">Get Pro</a>
+          </div>
+          <div class="card plan reveal">
+            <h3>Max</h3>
+            <p class="plan__price"><span data-monthly="₹1,299" data-yearly="₹1,039">₹1,299</span><small>/ month</small></p>
+            <p class="plan__note" data-monthly="billed monthly" data-yearly="₹12,468 billed yearly">billed monthly</p>
+            <ul>
+              <li>1,500 credits every month</li>
+              <li>Deep research for 2 credits</li>
+              <li>Extended thinking</li>
+              <li>10 files per message</li>
+            </ul>
+            <a class="btn btn--ghost btn--block" href="https://synapse-humanform.vercel.app/pricing">Get Max</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section class="section" aria-labelledby="privacy-title">
+        <div class="prose">
+          <h2 id="privacy-title" class="reveal">Private by design</h2>
+          <ul class="checks reveal">
+            <li><strong>Your payment details never reach SYNAPSE.</strong> Card and UPI details go straight to Razorpay; SYNAPSE only receives a signed confirmation.</li>
+            <li><strong>Passwords are hashed</strong> with bcrypt and never stored as text. Sign-in sessions use signed tokens that expire after seven days.</li>
+            <li><strong>Attachments aren't kept.</strong> File contents are read for the answer you asked for, then discarded; only the file name stays in your chat.</li>
+            <li><strong>You're in control.</strong> Export every chat as a file, delete all chats, or delete your account (which also stops any auto-pay) from Settings.</li>
+            <li><strong>Locked-down database.</strong> Your data lives in a Supabase Postgres database with its public data API closed off; only SYNAPSE's server can reach it, over HTTPS.</li>
+          </ul>
+          <p class="reveal muted">Questions are answered by an AI model through OpenRouter and web results come from Tavily; their terms apply to what you send. Avoid sharing confidential or personal documents with free AI models.</p>
+        </div>
+      </section>
+
+      <!-- At a glance -->
+      <section class="section" aria-labelledby="glance-title">
+        <div class="prose">
+          <h2 id="glance-title" class="reveal">At a glance</h2>
+        </div>
+        <div class="table-wrap reveal">
+          <table class="spec">
+            <tbody>
+              <tr><th scope="row">Default AI model</th><td>NVIDIA Nemotron, through OpenRouter</td></tr>
+              <tr><th scope="row">Web search</th><td>Tavily · 6 results per question · advanced depth in Deep research</td></tr>
+              <tr><th scope="row">Conversation memory</th><td>The 12 most recent messages in a chat</td></tr>
+              <tr><th scope="row">Files</th><td>PDF, DOCX, TXT, MD, CSV, JSON, PNG, JPG, WEBP, GIF · about 4 MB per message</td></tr>
+              <tr><th scope="row">Answer languages</th><td>17 languages, or match the language you write in</td></tr>
+              <tr><th scope="row">Sign-in</th><td>Email and password, or Google (on the web)</td></tr>
+              <tr><th scope="row">Payments</th><td>Razorpay · UPI AutoPay, cards, netbanking, wallets · INR</td></tr>
+              <tr><th scope="row">Platforms</th><td>Web · Windows 10/11 (64-bit) · Android 7.0+</td></tr>
+              <tr><th scope="row">Free credits</th><td>110 a day, reset at midnight India time</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Built with -->
+      <section class="section" aria-labelledby="built-title">
+        <div class="prose">
+          <h2 id="built-title" class="reveal">Built with</h2>
+          <p class="reveal">SYNAPSE stands on excellent services and open-source projects. Thank you to everyone who builds them. The <a href="https://synapse-docs.vercel.app/credits">full credits</a> are in the documentation.</p>
+        </div>
+        <ul class="logos reveal" aria-label="Services and projects SYNAPSE uses">
+          <li>OpenRouter</li><li>NVIDIA Nemotron</li><li>Tavily</li><li>Supabase</li><li>Vercel</li><li>Razorpay</li>
+          <li>Next.js</li><li>React</li><li>Tailwind CSS</li><li>FastAPI</li><li>Electron</li><li>Capacitor</li>
+          <li>Motion</li><li>Lucide</li><li>21st.dev</li><li>Inter</li><li>Source Serif 4</li>
+        </ul>
+      </section>
+
+      <!-- Availability -->
+      <section class="section" aria-labelledby="availability-title">
+        <div class="prose">
+          <h2 id="availability-title" class="reveal">Availability</h2>
+          <p class="reveal">SYNAPSE is available now for everyone, free, at <a href="https://synapse-humanform.vercel.app">synapse-humanform.vercel.app</a>. The Windows and Android apps can be <a href="#download">downloaded above</a>. Pro and Max plans are available in India through Razorpay. Read the <a href="https://synapse-docs.vercel.app">documentation</a> for guides, the full feature list and the API reference.</p>
+          <div class="cta-row reveal">
+            <a class="btn btn--primary" href="https://synapse-humanform.vercel.app">Try SYNAPSE free</a>
+            <a class="btn btn--ghost" href="https://synapse-docs.vercel.app">Read the docs</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Credits / footnotes -->
+      <section class="section footnotes" aria-labelledby="notes-title">
+        <div class="prose">
+          <h2 id="notes-title" class="footnotes__title">Credits and notes</h2>
+          <p><strong>Created by Revoori Ashwath Reddy</strong> at <strong>HumanForm Studios</strong>.</p>
+          <ol>
+            <li>Credits: Web research and Academic answers cost 1 credit; Deep research costs 3 on Pro and 2 on Max. Free credits reset daily at midnight (IST); paid credits refresh every 30 days from your subscription date.</li>
+            <li>The example conversations on this page are illustrations of SYNAPSE's answer format, not recorded answers.</li>
+            <li>The colour theme is based on the Claude theme by @serafimcloud on 21st.dev. SYNAPSE is an independent project by HumanForm Studios and is not affiliated with or endorsed by OpenAI, Anthropic, NVIDIA, OpenRouter, Tavily, Supabase, Vercel, Razorpay or Google.</li>
+          </ol>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <div class="footer__brand">
+        <a class="brand" href="/"><svg class="brand__mark" aria-hidden="true"><use href="#mark" /></svg><span class="brand__word">SYNAPSE</span></a>
+        <p>An AI research assistant by HumanForm Studios.</p>
+      </div>
+      <nav class="footer__cols" aria-label="Footer">
+        <div>
+          <h3>Product</h3>
+          <a href="https://synapse-humanform.vercel.app">Open SYNAPSE</a>
+          <a href="https://synapse-humanform.vercel.app/pricing">Pricing</a>
+          <a href="#download">Download</a>
+        </div>
+        <div>
+          <h3>Resources</h3>
+          <a href="https://synapse-docs.vercel.app">Documentation</a>
+          <a href="https://synapse-docs.vercel.app/getting-started">Getting started</a>
+          <a href="https://synapse-docs.vercel.app/api-reference">API reference</a>
+          <a href="https://synapse-docs.vercel.app/credits">Credits</a>
+        </div>
+        <div>
+          <h3>Studio</h3>
+          <a href="https://synapse-docs.vercel.app/about">HumanForm Studios</a>
+          <a href="https://github.com/TrueVeX/synapse">Source on GitHub</a>
+          <a href="https://github.com/TrueVeX/synapse/releases">Releases</a>
+        </div>
+      </nav>
+    </div>
+    <div class="footer__bottom">
+      <p>© <span data-year>2026</span> HumanForm Studios · Created by Revoori Ashwath Reddy</p>
+      <a href="#top" class="to-top">Back to top ↑</a>
+    </div>
+  </footer>
+
+  <script src="/main.js" defer></script>
+</body>
+</html>

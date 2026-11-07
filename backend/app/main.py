@@ -812,18 +812,37 @@ def extract_document_text(filename: str, data: bytes):
 
     if extension == ".pdf":
         try:
-            import fitz
+            try:
+                import fitz  # PyMuPDF: best quality, optional
+            except ImportError:
+                fitz = None
 
-            with fitz.open(
-                stream=data,
-                filetype="pdf",
-            ) as pdf:
+            if fitz:
+                with fitz.open(
+                    stream=data,
+                    filetype="pdf",
+                ) as pdf:
+                    pages = [
+                        page.get_text("text")
+                        for page in pdf
+                    ]
+            else:
+                # pypdf: pure Python, small enough for Vercel.
+                from pypdf import PdfReader
+
+                reader = PdfReader(BytesIO(data))
                 pages = [
-                    page.get_text("text")
-                    for page in pdf
+                    page.extract_text() or ""
+                    for page in reader.pages
                 ]
 
-            return "\n\n".join(pages)[:100000]
+            text = "\n\n".join(pages).strip()
+            if not text:
+                raise ValueError(
+                    "it has no selectable text (it may be a scanned image)"
+                )
+
+            return text[:100000]
 
         except Exception as exc:
             raise ValueError(
