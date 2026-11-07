@@ -30,7 +30,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
@@ -2537,6 +2537,7 @@ def get_billing_status(
 @app.post("/api/billing/checkout")
 def create_checkout(
     payload: CheckoutRequest,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     user = require_user(authorization)
@@ -2554,6 +2555,13 @@ def create_checkout(
 
     amount = PLANS[plan_key]["prices"][billing]
     description = f"SYNAPSE {PLANS[plan_key]['name']} · {billing.capitalize()}"
+    # Where the full-page (mobile) checkout returns to after paying.
+    callback_url = str(request.url_for("razorpay_callback"))
+    if callback_url.startswith("http://") and ON_VERCEL:
+        callback_url = "https://" + callback_url[len("http://"):]
+    site = (request.headers.get("origin") or "").rstrip("/")
+    if site in ALLOWED_ORIGINS:
+        callback_url += "?back=" + requests.utils.quote(site, safe="")
     plan_id = RAZORPAY_PLAN_IDS.get((plan_key, billing))
 
     # ---- Auto-pay: an auto-renewing Razorpay subscription ------------------
@@ -2596,6 +2604,7 @@ def create_checkout(
 
         return {
             "mode": "subscription",
+            "callback_url": callback_url,
             "key_id": RAZORPAY_KEY_ID,
             "subscription_id": subscription["id"],
             "amount": amount,
@@ -2646,6 +2655,7 @@ def create_checkout(
 
     return {
         "mode": "order",
+        "callback_url": callback_url,
         "key_id": RAZORPAY_KEY_ID,
         "order_id": order["id"],
         "amount": amount,
@@ -2723,6 +2733,69 @@ def verify_payment(
 
     activate_payment(payment["order_id"], payload.razorpay_payment_id)
     return billing_status(user["id"])
+
+
+def razorpay_signature_ok(message: str, signature: str):
+    if not (RAZORPAY_KEY_SECRET and signature):
+        return False
+    expected = hmac.new(RAZORPAY_KEY_SECRET.encode(), message.encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+@app.post("/api/billing/callback")
+async def razorpay_callback(request: Request, back: str = ""):
+    """Full-page checkout (used on phones and in the apps).
+
+    Razorpay sends the browser here after paying, instead of calling a
+    function in the page. We check the signature, activate the plan and
+    send the user back to the pricing page with the result.
+    """
+
+    origin = back.strip().rstrip("/")
+    site = origin if origin in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
+
+    def back_to(result: str, message: str = ""):
+        query = f"payment={result}"
+        if message:
+            query += "&message=" + requests.utils.quote(message[:200])
+        return RedirectResponse(f"{site}/pricing?{query}", status_code=303)
+
+    form = await request.form()
+    payment_id = str(form.get("razorpay_payment_id") or "")
+    signature = str(form.get("razorpay_signature") or "")
+    subscription_id = str(form.get("razorpay_subscription_id") or "")
+    order_id = str(form.get("razorpay_order_id") or "")
+
+    if not payment_id:
+        # Razorpay reports a failed or cancelled payment with error[...] fields.
+        return back_to("failed", str(form.get("error[description]") or ""))
+
+    try:
+        if subscription_id:
+            if not razorpay_signature_ok(f"{payment_id}|{subscription_id}", signature):
+                return back_to("failed", "The payment could not be verified.")
+            current_end, amount = None, None
+            try:
+                details = razorpay_call("GET", f"/subscriptions/{subscription_id}")
+                current_end = unix_to_iso(details.get("current_end"))
+                amount = razorpay_call("GET", f"/payments/{payment_id}").get("amount")
+            except HTTPException:
+                traceback.print_exc()
+            if not record_subscription_charge(subscription_id, payment_id, amount, current_end):
+                return back_to("failed", "We couldn't find that subscription.")
+        elif order_id:
+            if not razorpay_signature_ok(f"{order_id}|{payment_id}", signature):
+                return back_to("failed", "The payment could not be verified.")
+            if not activate_payment(order_id, payment_id):
+                return back_to("failed", "We couldn't find that payment.")
+        else:
+            return back_to("failed")
+    except Exception:
+        traceback.print_exc()
+        # The webhook will still activate the plan if money was taken.
+        return back_to("pending")
+
+    return back_to("success")
 
 
 @app.post("/api/billing/webhook")

@@ -1,4 +1,5 @@
 {
   "url": "https://synapse-humanform.vercel.app",
-  "_note": "Set url to your deployed SYNAPSE website (e.g. https://your-site.vercel.app), then rebuild the apps. While it is empty the apps show a 'not connected yet' screen."
+  "_note": "url = your deployed SYNAPSE website, api = its backend (used for the Razorpay return page). Rebuild the apps after changing them. While url is empty the apps show a 'not connected yet' screen.",
+  "api": "https://synapse-ai-research.vercel.app"
 }

@@ -9,6 +9,9 @@ import { ArrowLeft, CheckCircle2, Receipt, Sparkles, X } from "lucide-react";
 import { Pricing, type PricingPlan } from "@/components/ui/pricing";
 import { SynapseMark } from "@/components/chat/synapse-mark";
 import { CreditMeter } from "@/components/chat/credit-meter";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { isInsideApp } from "@/lib/google";
+import { MobileCheckout } from "./mobile-checkout";
 import {
   ApiError,
   api,
@@ -35,6 +38,9 @@ type RazorpayOptions = {
   order_id?: string;
   // Auto-pay subscription
   subscription_id?: string;
+  // Full-page checkout (phones / apps): Razorpay returns to callback_url.
+  callback_url?: string;
+  redirect?: boolean;
   prefill?: { name?: string; email?: string };
   theme?: { color?: string; backdrop_color?: string };
   handler: (response: RazorpayResponse) => void;
@@ -49,6 +55,7 @@ declare global {
 
 type Checkout = {
   mode: "order" | "subscription";
+  callback_url?: string;
   key_id: string;
   order_id?: string;
   subscription_id?: string;
@@ -114,6 +121,11 @@ export default function PricingPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  // Phones and the Windows/Android apps get the simpler full-page checkout.
+  const smallScreen = useMediaQuery("(max-width: 767px)");
+  const [inApp, setInApp] = useState(false);
+  useEffect(() => setInApp(isInsideApp()), []);
+  const mobile = smallScreen || inApp;
 
   const refreshAccount = useCallback(async () => {
     if (!getToken()) return;
@@ -141,6 +153,29 @@ export default function PricingPage() {
       .catch((error) => setLoadError(error instanceof Error ? error.message : "Could not load plans."));
     refreshAccount();
   }, [refreshAccount]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("payment");
+    if (!result) return;
+    const message = params.get("message");
+    if (result === "success") {
+      setNotice({ kind: "success", text: "Payment successful! Your plan is active and your credits are ready." });
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.3 }, colors: ["#d97757", "#9c87f5", "#faf9f5"], disableForReducedMotion: true });
+    } else if (result === "pending") {
+      setNotice({ kind: "success", text: "Payment received. Your plan will be active within a few minutes." });
+    } else {
+      setNotice({ kind: "error", text: message || "The payment didn't go through. You weren't charged." });
+    }
+    window.history.replaceState(null, "", "/pricing");
+  }, []);
+
+  useEffect(() => {
+    // Coming back from Razorpay with the browser's Back button.
+    const onShow = () => setBusyPlanId(null);
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   const cards = useMemo<PricingPlan[]>(() => {
     if (!plans) return [];
@@ -175,7 +210,7 @@ export default function PricingPage() {
     });
   }, [plans, status, signedIn]);
 
-  async function startCheckout(plan: PricingPlan, billing: "monthly" | "annual") {
+  async function startCheckout(planId: string, billing: "monthly" | "annual", redirect = false) {
     setNotice(null);
     if (!getToken()) {
       router.push(`/login?next=${encodeURIComponent("/pricing")}`);
@@ -186,11 +221,11 @@ export default function PricingPage() {
       return;
     }
 
-    setBusyPlanId(plan.id);
+    setBusyPlanId(planId);
     try {
       const [ready, order] = await Promise.all([
         loadRazorpay(),
-        api<Checkout>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan: plan.id, billing }) }),
+        api<Checkout>("/api/billing/checkout", { method: "POST", body: JSON.stringify({ plan: planId, billing }) }),
       ]);
       if (!ready || !window.Razorpay) throw new ApiError("Couldn't load the Razorpay checkout. Check your connection.", 0);
 
@@ -203,6 +238,8 @@ export default function PricingPage() {
           : { amount: order.amount, currency: order.currency, order_id: order.order_id }),
         prefill: order.prefill,
         theme: { color: "#d97757", backdrop_color: "rgba(20, 20, 19, 0.75)" },
+        // Phones / apps: open Razorpay as a full page and come back afterwards.
+        ...(redirect && order.callback_url ? { callback_url: order.callback_url, redirect: true } : {}),
         handler: async (response) => {
           try {
             const updated = await api<BillingStatus>("/api/billing/verify", {
@@ -252,6 +289,7 @@ export default function PricingPage() {
       const updated = await api<BillingStatus>("/api/billing/cancel", { method: "POST" });
       setStatus(updated);
       setConfirmCancel(false);
+      refreshAccount();
       setNotice({
         kind: "success",
         text: `Auto-renew is off. You keep SYNAPSE ${updated.plan_name} until ${formatDate(updated.expires_at!)} and won't be charged again.`,
@@ -291,7 +329,12 @@ export default function PricingPage() {
 
       {/* Payment messages float at the bottom of the screen so they are seen
           wherever the plan button was tapped (on phones the plans sit far below the top). */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div
+        className={
+          "pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4 " +
+          (mobile && plans ? "bottom-[calc(7.25rem+env(safe-area-inset-bottom))]" : "bottom-0 pb-[max(1rem,env(safe-area-inset-bottom))]")
+        }
+      >
         <AnimatePresence>
           {notice && (
             <motion.div
@@ -325,6 +368,19 @@ export default function PricingPage() {
         </AnimatePresence>
       </div>
 
+      {mobile && plans && !loadError ? (
+        <MobileCheckout
+          plans={plans}
+          status={status}
+          signedIn={signedIn}
+          busy={busyPlanId !== null}
+          cancelling={cancelling}
+          // Full-page Razorpay in phone browsers and the Android app; the
+          // Windows app keeps the pop-up (its window only allows Razorpay pages).
+          onPay={(planId, billing) => startCheckout(planId, billing, !(inApp && !/Android/i.test(navigator.userAgent)))}
+          onCancelAutopay={cancelAutopay}
+        />
+      ) : (
       <div className="mx-auto max-w-6xl px-4">
 
         {status && (
@@ -399,7 +455,7 @@ export default function PricingPage() {
             plans={cards}
             title="Research without limits"
             description={"Start free. Upgrade when you need more answers or Deep research.\nAll prices are in Indian Rupees (INR)."}
-            onSelect={startCheckout}
+            onSelect={(plan, billing) => startCheckout(plan.id, billing)}
             busyPlanId={busyPlanId}
             autoRenew={Boolean(plans.autopay)}
           />
@@ -489,6 +545,7 @@ export default function PricingPage() {
           SYNAPSE · Created by <span className="text-foreground">Revoori Ashwath Reddy</span> · <span className="text-foreground">HumanForm Studios</span>
         </footer>
       </div>
+      )}
     </main>
   );
 }

@@ -5,8 +5,16 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "..");
 const apps = path.join(root, "..");
-const { url = "" } = JSON.parse(fs.readFileSync(path.join(apps, "app.config.json"), "utf8"));
+const { url = "", api = "" } = JSON.parse(fs.readFileSync(path.join(apps, "app.config.json"), "utf8"));
 const siteUrl = url.trim().replace(/\/+$/, "");
+// The backend host: Razorpay returns there after a full-page payment.
+const apiHost = (() => {
+  try {
+    return api ? new URL(api).host : "";
+  } catch {
+    return "";
+  }
+})();
 
 // www/ is what the app shows when it can't open the website.
 fs.mkdirSync(path.join(root, "www"), { recursive: true });
@@ -29,7 +37,7 @@ const config = {
   appendUserAgent: "SynapseApp/1.0",
   android: { allowMixedContent: false },
   server: siteUrl
-    ? { url: siteUrl, errorPath: "offline.html", allowNavigation: ["*.razorpay.com"] }
+    ? { url: siteUrl, errorPath: "offline.html", allowNavigation: ["*.razorpay.com", ...(apiHost ? [apiHost] : [])] }
     : { errorPath: "offline.html" },
 };
 fs.writeFileSync(path.join(root, "capacitor.config.json"), JSON.stringify(config, null, 2) + "\n");
