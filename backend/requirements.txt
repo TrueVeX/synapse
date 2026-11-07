@@ -1,0 +1,15 @@
+fastapi==0.162.0
+starlette==1.10.0
+pydantic==2.14.3
+uvicorn[standard]==0.54.0
+requests==2.34.2
+python-dotenv==1.2.4
+passlib[bcrypt]==1.7.4
+# passlib only works with bcrypt 4.0.x
+bcrypt==4.0.1
+python-jose[cryptography]==3.5.0
+email-validator==2.3.0
+python-multipart==0.0.33
+python-docx==1.2.0
+# Postgres driver, used when DATABASE_URL points at Supabase
+psycopg[binary]==3.3.8

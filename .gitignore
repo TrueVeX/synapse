@@ -1,0 +1,25 @@
+# Dependencies and build output
+node_modules/
+.next/
+*.tsbuildinfo
+.vercel/
+
+# Secrets: never commit these (examples are fine)
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local databases (user accounts and chats)
+*.db
+*.db-journal
+
+# Local-only folders and notes
+.backup-before-chat-ui/
+.ui-test-tmp/
+CLAUDE_HANDOFF.md

@@ -1,0 +1,30 @@
+import type { Metadata, Viewport } from "next";
+import { Inter, Source_Serif_4 } from "next/font/google";
+import "./globals.css";
+
+// Sans-serif for the interface, serif for the greeting and AI answers.
+const sans = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const serif = Source_Serif_4({ subsets: ["latin"], variable: "--font-source-serif", display: "swap" });
+
+export const metadata: Metadata = {
+  title: "SYNAPSE — AI Research",
+  description: "A focused AI research workspace",
+};
+
+// Phones: fill the screen edge to edge (notches handled with safe-area padding)
+// and shrink the page when the keyboard opens so the input box stays visible.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#262624",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className={`dark ${sans.variable} ${serif.variable}`}>
+      <body>{children}</body>
+    </html>
+  );
+}

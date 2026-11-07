@@ -1,0 +1,9 @@
+# Never upload secrets, the local database or the virtual environment.
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+*.db
+*.db-journal
