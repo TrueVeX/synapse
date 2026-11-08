@@ -2081,6 +2081,75 @@ async def chat_stream(
     )
 
 
+class RelatedRequest(BaseModel):
+    conversation_id: str = Field(min_length=1, max_length=100)
+
+
+@app.post("/api/chat/related")
+def related_questions(
+    payload: RelatedRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Suggests three short follow-up questions for the latest answer in a
+    chat (the "Related" list). Free: no credits are used."""
+
+    user = require_user(authorization)
+    get_owned_conversation(payload.conversation_id, user["id"])
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT role, content FROM messages
+            WHERE conversation_id = ?
+            ORDER BY id DESC LIMIT 2
+            """,
+            (payload.conversation_id,),
+        ).fetchall()
+
+    question = next((r["content"] for r in rows if r["role"] == "user"), "")
+    answer = next((r["content"] for r in rows if r["role"] == "assistant"), "")
+    if not question or not OPENROUTER_API_KEY:
+        return {"questions": []}
+
+    prompt = (
+        "Suggest exactly 3 short follow-up questions a curious user might ask next, "
+        "based on this exchange. Each under 12 words, in the same language as the "
+        "question. Reply with only a JSON array of 3 strings.\n\n"
+        f"Question: {question[:600]}\n\nAnswer: {answer[:1800]}"
+    )
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "X-Title": "SYNAPSE",
+            },
+            json={
+                "model": OPENROUTER_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1200,
+                "reasoning": {"effort": "low", "exclude": True},
+            },
+            timeout=40,
+        )
+        response.raise_for_status()
+        text = response.json()["choices"][0]["message"].get("content") or ""
+        match = _re.search(r"\[[\s\S]*\]", text)
+        items = json.loads(match.group(0)) if match else []
+        questions = [
+            " ".join(str(item).split())[:140]
+            for item in items
+            if isinstance(item, str) and item.strip()
+        ][:3]
+    except Exception:
+        traceback.print_exc()
+        questions = []
+
+    return {"questions": questions}
+
+
 @app.post("/api/chat/stop")
 def stop_generation(
     payload: StopGenerationRequest,
