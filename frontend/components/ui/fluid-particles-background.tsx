@@ -1,7 +1,7 @@
 "use client";
 
 // Fluid particles background (21st.dev), adapted for SYNAPSE:
-// - particles in the SYNAPSE palette (warm orange, violet, cream) instead of grey
+// - monochrome particles (white on black / black on white), as in the original
 // - transparent trails, so the glowing live background shows through
 // - fewer particles and 30fps on phones; pauses when the tab is hidden,
 //   when Settings → Live background is off, or with "reduce motion"
@@ -54,12 +54,13 @@ function createNoise() {
   };
 }
 
-// SYNAPSE palette: [r, g, b] per theme. Most particles are warm orange.
+// Monochrome, like the original component: white particles on black in dark
+// mode, black on white in light mode (a few slightly grey ones for depth).
 const PALETTE = {
-  dark: [[217, 119, 87], [232, 150, 118], [156, 135, 245], [250, 249, 245]],
-  light: [[201, 100, 66], [180, 85, 45], [124, 104, 220], [120, 90, 60]],
+  dark: [[255, 255, 255], [255, 255, 255], [212, 212, 212], [163, 163, 163]],
+  light: [[0, 0, 0], [0, 0, 0], [38, 38, 38], [82, 82, 82]],
 } as const;
-const MIX = [0, 0, 1, 2, 3, 0, 1, 2]; // weighting: orange ×3, light orange ×2, violet ×2, cream ×1
+const MIX = [0, 0, 1, 2, 3, 0, 1, 2];
 
 interface Particle {
   x: number; y: number; size: number; life: number; maxLife: number; tint: number;

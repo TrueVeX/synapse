@@ -264,7 +264,7 @@
   var frameGap = coarse ? 1000 / 30 : 0;
   var lastFrame = 0;
 
-  var COLORS = { warm: [217, 119, 87], violet: [156, 135, 245], light: [250, 249, 245] };
+  var COLORS = { warm: [255, 255, 255], violet: [163, 163, 163], light: [250, 250, 250] };
   var nodes = [];
   var pulses = [];
   var width = 0;

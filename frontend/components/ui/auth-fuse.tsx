@@ -357,14 +357,14 @@ export function AuthUI({ initialMode = "signin" }: { initialMode?: Mode }) {
       {/* SYNAPSE panel (desktop and tablets) */}
       <div className="hidden p-4 md:block">
         <div className="glass glass-sheen relative flex h-full min-h-[560px] flex-col justify-between overflow-hidden rounded-[32px] p-10">
-          <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-primary/25 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-16 size-72 rounded-full bg-[#9c87f5]/20 blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-primary/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-16 size-72 rounded-full bg-foreground/10 blur-3xl" />
           <div className="relative flex items-center gap-3">
             <SynapseMark size={28} />
             <span className="font-serif text-2xl text-card-foreground">SYNAPSE</span>
           </div>
           <div className="relative flex flex-1 items-center justify-center">
-            <SynapseMark size={150} animate className="opacity-90 drop-shadow-[0_0_40px_rgba(217,119,87,0.45)]" />
+            <SynapseMark size={150} animate className="opacity-90 drop-shadow-[0_0_40px_rgba(255,255,255,0.25)]" />
           </div>
           <div className="relative space-y-6">
             <blockquote className="space-y-2">

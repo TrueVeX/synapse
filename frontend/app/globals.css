@@ -568,3 +568,78 @@ html[data-live-bg="off"] .live-bg__blob { animation: none; }
 
 /* Auth pages: let the live background show through */
 .synapse-auth-bg { background: transparent; }
+
+/* =====================================================================
+   Monochrome palette, matched to the fluid particles background
+   (white particles on black in dark mode, black on white in light mode).
+   Later rules win, so this overrides the warm palette above.
+   ===================================================================== */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --card-foreground: #0a0a0a;
+  --popover-foreground: #0a0a0a;
+  --primary: #0a0a0a;
+  --primary-foreground: #fafafa;
+  --ring: #525252;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #262626;
+  --muted-foreground: #737373;
+  --accent-foreground: #171717;
+  --sidebar-primary: #0a0a0a;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-foreground: #262626;
+  --sidebar-accent-foreground: #171717;
+  --chart-1: #171717;
+  --chart-2: #737373;
+  --chart-3: #d4d4d4;
+  --chart-4: #e5e5e5;
+  --chart-5: #404040;
+  --sidebar: rgba(255, 255, 255, 0.5);
+  --sidebar-accent: rgba(0, 0, 0, 0.06);
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+  --accent: rgba(0, 0, 0, 0.05);
+  --muted: rgba(0, 0, 0, 0.04);
+  --border: rgba(0, 0, 0, 0.1);
+  --input: rgba(0, 0, 0, 0.16);
+  --bg-200: rgba(0, 0, 0, 0.05);
+  --bg-300: rgba(0, 0, 0, 0.1);
+  --glass-tint: rgba(255, 255, 255, 0.55);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --glass-line: rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.18);
+  --bg-blob-1: rgba(0, 0, 0, 0.07);
+  --bg-blob-2: rgba(0, 0, 0, 0.05);
+  --bg-blob-3: rgba(0, 0, 0, 0.04);
+  --bg-blob-4: rgba(0, 0, 0, 0.03);
+}
+.dark {
+  --background: #000000;
+  --foreground: #d4d4d4;
+  --card-foreground: #fafafa;
+  --popover-foreground: #ededed;
+  --primary: #fafafa;
+  --primary-foreground: #0a0a0a;
+  --ring: #a3a3a3;
+  --secondary: #fafafa;
+  --secondary-foreground: #171717;
+  --muted-foreground: #a3a3a3;
+  --accent-foreground: #f5f5f5;
+  --sidebar-primary: #262626;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-foreground: #d4d4d4;
+  --sidebar-accent-foreground: #f5f5f5;
+  --chart-1: #fafafa;
+  --chart-2: #a3a3a3;
+  --chart-3: #262626;
+  --chart-4: #404040;
+  --chart-5: #d4d4d4;
+  --popover: rgba(18, 18, 18, 0.8);
+  --sidebar: rgba(10, 10, 10, 0.5);
+  --glass-strong: rgba(14, 14, 14, 0.74);
+  --bg-blob-1: rgba(255, 255, 255, 0.07);
+  --bg-blob-2: rgba(255, 255, 255, 0.05);
+  --bg-blob-3: rgba(255, 255, 255, 0.04);
+  --bg-blob-4: rgba(255, 255, 255, 0.03);
+}

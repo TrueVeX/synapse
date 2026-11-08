@@ -163,7 +163,7 @@ export default function PricingPage() {
     const message = params.get("message");
     if (result === "success") {
       setNotice({ kind: "success", text: "Payment successful! Your plan is active and your credits are ready." });
-      confetti({ particleCount: 120, spread: 80, origin: { y: 0.3 }, colors: ["#d97757", "#9c87f5", "#faf9f5"], disableForReducedMotion: true });
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.3 }, colors: ["#ffffff", "#a3a3a3", "#525252"], disableForReducedMotion: true });
     } else if (result === "pending") {
       setNotice({ kind: "success", text: "Payment received. Your plan will be active within a few minutes." });
     } else {
@@ -239,7 +239,7 @@ export default function PricingPage() {
           ? { subscription_id: order.subscription_id }
           : { amount: order.amount, currency: order.currency, order_id: order.order_id }),
         prefill: order.prefill,
-        theme: { color: "#d97757", backdrop_color: "rgba(20, 20, 19, 0.75)" },
+        theme: { color: "#0a0a0a", backdrop_color: "rgba(20, 20, 19, 0.75)" },
         // Phones / apps: open Razorpay as a full page and come back afterwards.
         ...(redirect && order.callback_url ? { callback_url: order.callback_url, redirect: true } : {}),
         // Inside the Android app: show UPI apps (GPay, PhonePe, Paytm...), which
@@ -259,7 +259,7 @@ export default function PricingPage() {
                 updated.autopay ? " Your plan renews automatically; cancel any time." : ""
               }`,
             });
-            confetti({ particleCount: 120, spread: 80, origin: { y: 0.3 }, colors: ["#d97757", "#9c87f5", "#faf9f5"], disableForReducedMotion: true });
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.3 }, colors: ["#ffffff", "#a3a3a3", "#525252"], disableForReducedMotion: true });
           } catch (error) {
             setNotice({
               kind: "error",

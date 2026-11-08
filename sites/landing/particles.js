@@ -1,6 +1,6 @@
 // Fluid particles background (adapted from the 21st.dev component used in the
-// SYNAPSE app): particles drift along a Perlin-noise flow field in the SYNAPSE
-// palette, over the glowing live background. Lighter on phones, paused when
+// SYNAPSE app): particles drift along a Perlin-noise flow field in black and
+// white, over the glowing live background. Lighter on phones, paused when
 // the tab is hidden or the device prefers reduced motion.
 (function () {
   "use strict";
@@ -35,8 +35,8 @@
   }
 
   var PALETTE = {
-    dark: [[217, 119, 87], [232, 150, 118], [156, 135, 245], [250, 249, 245]],
-    light: [[201, 100, 66], [180, 85, 45], [124, 104, 220], [120, 90, 60]]
+    dark: [[255, 255, 255], [255, 255, 255], [212, 212, 212], [163, 163, 163]],
+    light: [[0, 0, 0], [0, 0, 0], [38, 38, 38], [82, 82, 82]]
   };
   var MIX = [0, 0, 1, 2, 3, 0, 1, 2];
   var width = 0, height = 0, particles = [], last = 0, frameGap = coarse ? 1000 / 30 : 0;

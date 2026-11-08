@@ -143,4 +143,4 @@ SYNAPSE is built on these services and open-source projects. Thank you to their 
 
 ## License
 
-© HumanForm Studios. All rights reserved by Revoori Ashwath Reddy and HumanForm Studios unless a license file is added.
+SYNAPSE is open source under the [MIT License](LICENSE). © 2026 Revoori Ashwath Reddy (HumanForm Studios).
