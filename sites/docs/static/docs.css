@@ -352,15 +352,6 @@ body { background: var(--bg); }
 [data-theme="light"] .nav-group a:hover { background: rgba(0, 0, 0, 0.05); }
 
 /* ---------- Floating paths live background (21st.dev @bundui) ---------- */
+/* The lines are drawn on a canvas; its CSS colour sets the line colour. */
 .floating-paths { position: absolute; inset: 0; width: 100%; height: 100%; color: #fff; }
-.floating-paths path {
-  stroke-dasharray: 0.6 0.4;
-  animation-name: fp-flow, fp-pulse;
-  animation-timing-function: linear, ease-in-out;
-  animation-iteration-count: infinite, infinite;
-  animation-direction: normal, alternate;
-}
-@keyframes fp-flow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -1; } }
-@keyframes fp-pulse { from { opacity: 0.5; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .floating-paths path { animation: none; } }
 :root[data-theme="light"] .floating-paths { color: #000; }
