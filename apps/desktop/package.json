@@ -1,7 +1,7 @@
 {
   "name": "synapse-desktop",
   "productName": "SYNAPSE",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SYNAPSE AI research assistant for Windows. Created by Revoori Ashwath Reddy at HumanForm Studios.",
   "author": "HumanForm Studios",
   "main": "main.js",

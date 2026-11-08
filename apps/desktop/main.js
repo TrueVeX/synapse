@@ -44,7 +44,7 @@ function createWindow() {
     minWidth: 380,
     minHeight: 560,
     title: "SYNAPSE",
-    backgroundColor: "#262624",
+    backgroundColor: "#000000",
     autoHideMenuBar: true,
     icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
