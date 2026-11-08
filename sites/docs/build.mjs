@@ -220,6 +220,7 @@ ${html}
   </div>
 </div>
 <script src="/assets/docs.js" defer></script>
+<script src="/assets/particles.js" defer></script>
 </body>
 </html>
 `;

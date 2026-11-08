@@ -1,5 +1,7 @@
-// The moving, softly glowing background behind the whole app ("liquid glass").
-// Pure CSS animation (GPU transforms only); it stops when Settings → Live
+import { FluidParticlesBackground } from "@/components/ui/fluid-particles-background";
+
+// The moving background behind the whole app: soft glowing colours plus
+// fluid particles in the SYNAPSE palette. Both stop when Settings → Live
 // background is off or the device asks for reduced motion.
 export function LiveBackground() {
   return (
@@ -8,6 +10,7 @@ export function LiveBackground() {
       <div className="live-bg__blob live-bg__blob--2" />
       <div className="live-bg__blob live-bg__blob--3" />
       <div className="live-bg__blob live-bg__blob--4" />
+      <FluidParticlesBackground className="absolute inset-0" />
       <div className="live-bg__grain" />
     </div>
   );
