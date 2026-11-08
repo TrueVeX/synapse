@@ -456,3 +456,115 @@ html:not(.dark) .hljs-deletion { color: #c42b2b; }
     0 0 0 1px color-mix(in oklch, oklch(0.205 0 0) 94%, white),
     inset 0 -1px 1px -0.5px color-mix(in oklch, oklch(0.205 0 0) 95%, white);
 }
+
+/* =====================================================================
+   SYNAPSE "liquid glass" theme
+   Translucent, frosted surfaces over a slowly moving live background.
+   (Overrides the earlier token values; later rules win.)
+   ===================================================================== */
+:root {
+  --background: #f1eee6;
+  --card: rgba(255, 255, 255, 0.55);
+  --popover: rgba(255, 255, 255, 0.82);
+  --sidebar: rgba(255, 255, 255, 0.42);
+  --sidebar-accent: rgba(20, 20, 19, 0.07);
+  --sidebar-border: rgba(20, 20, 19, 0.08);
+  --accent: rgba(20, 20, 19, 0.06);
+  --muted: rgba(20, 20, 19, 0.05);
+  --border: rgba(20, 20, 19, 0.1);
+  --input: rgba(20, 20, 19, 0.16);
+  --bg-200: rgba(20, 20, 19, 0.06);
+  --bg-300: rgba(20, 20, 19, 0.12);
+  --glass-tint: rgba(255, 255, 255, 0.5);
+  --glass-strong: rgba(255, 255, 255, 0.72);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-line: rgba(20, 20, 19, 0.08);
+  --glass-shadow: 0 10px 40px -12px rgba(60, 40, 20, 0.22);
+  --bg-blob-1: rgba(217, 119, 87, 0.42);
+  --bg-blob-2: rgba(156, 135, 245, 0.34);
+  --bg-blob-3: rgba(94, 178, 199, 0.28);
+  --bg-blob-4: rgba(240, 190, 120, 0.3);
+}
+.dark {
+  --background: #121110;
+  --card: rgba(255, 255, 255, 0.045);
+  --popover: rgba(32, 31, 29, 0.78);
+  --sidebar: rgba(20, 19, 18, 0.5);
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --accent: rgba(255, 255, 255, 0.07);
+  --muted: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.14);
+  --bg-200: rgba(255, 255, 255, 0.07);
+  --bg-300: rgba(255, 255, 255, 0.14);
+  --glass-tint: rgba(255, 255, 255, 0.055);
+  --glass-strong: rgba(30, 29, 27, 0.72);
+  --glass-edge: rgba(255, 255, 255, 0.16);
+  --glass-line: rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 16px 50px -14px rgba(0, 0, 0, 0.65);
+  --bg-blob-1: rgba(217, 119, 87, 0.34);
+  --bg-blob-2: rgba(156, 135, 245, 0.28);
+  --bg-blob-3: rgba(64, 150, 170, 0.22);
+  --bg-blob-4: rgba(200, 120, 70, 0.2);
+}
+
+/* Glass surfaces (in the components layer so Tailwind utilities like `fixed` still win) */
+@layer components {
+.glass,
+.glass-strong,
+.glass-pill {
+  position: relative;
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid var(--glass-line);
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow);
+}
+.glass-strong {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+}
+.glass-pill { border-radius: 9999px; box-shadow: inset 0 1px 0 var(--glass-edge), 0 6px 20px -10px rgba(0, 0, 0, 0.35); }
+/* A soft specular sheen across the top edge, like curved glass */
+.glass-sheen::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 38%);
+}
+.dark .glass-sheen::before { background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 38%); }
+}
+/* Popovers and dialogs everywhere get the frosted look */
+.bg-popover { -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
+
+/* ---------- Live background ---------- */
+.live-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--background); }
+.live-bg__blob {
+  position: absolute; border-radius: 50%; filter: blur(70px); will-change: transform;
+  animation: live-drift 26s ease-in-out infinite alternate;
+}
+.live-bg__blob--1 { width: 55vmax; height: 55vmax; left: -12vmax; top: -16vmax; background: radial-gradient(circle, var(--bg-blob-1), transparent 65%); }
+.live-bg__blob--2 { width: 50vmax; height: 50vmax; right: -14vmax; top: 18vh; background: radial-gradient(circle, var(--bg-blob-2), transparent 65%); animation-duration: 32s; animation-delay: -8s; }
+.live-bg__blob--3 { width: 46vmax; height: 46vmax; left: 18vw; bottom: -20vmax; background: radial-gradient(circle, var(--bg-blob-3), transparent 65%); animation-duration: 38s; animation-delay: -14s; }
+.live-bg__blob--4 { width: 30vmax; height: 30vmax; left: 45vw; top: 8vh; background: radial-gradient(circle, var(--bg-blob-4), transparent 65%); animation-duration: 22s; animation-delay: -4s; }
+.live-bg__grain {
+  position: absolute; inset: 0; opacity: 0.05; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+@keyframes live-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(6vw, 4vh, 0) scale(1.08); }
+  66% { transform: translate3d(-4vw, 7vh, 0) scale(0.94); }
+  100% { transform: translate3d(3vw, -5vh, 0) scale(1.05); }
+}
+html[data-live-bg="off"] .live-bg__blob { animation: none; }
+@media (prefers-reduced-motion: reduce) { .live-bg__blob { animation: none; } }
+@media (max-width: 640px) { .live-bg__blob { filter: blur(56px); } }
+
+/* Source cards row (scrolls sideways) */
+.source-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; padding: 2px 2px 6px; }
+.source-row::-webkit-scrollbar { display: none; }
+.source-row > * { scroll-snap-align: start; }
+
+/* Auth pages: let the live background show through */
+.synapse-auth-bg { background: transparent; }

@@ -137,7 +137,7 @@ export function Pricing({
             "transform-gpu ring-offset-current transition-all duration-300 ease-out hover:ring-2 hover:ring-primary hover:ring-offset-1 hover:bg-primary hover:text-primary-foreground",
             plan.isPopular
               ? "bg-primary text-primary-foreground"
-              : "bg-background text-foreground",
+              : "bg-transparent text-foreground",
             disabled && "pointer-events-none opacity-60",
           );
 
@@ -165,7 +165,7 @@ export function Pricing({
                 opacity: { duration: 0.5 },
               }}
               className={cn(
-                `rounded-2xl border-[1px] p-6 bg-background text-center lg:flex lg:flex-col lg:justify-center relative`,
+                `glass glass-sheen rounded-3xl border-[1px] p-6 text-center lg:flex lg:flex-col lg:justify-center relative`,
                 plan.isPopular ? "border-primary border-2" : "border-border",
                 "flex flex-col",
                 !plan.isPopular && "mt-5",

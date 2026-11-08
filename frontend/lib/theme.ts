@@ -3,7 +3,27 @@
 export type ThemeChoice = "dark" | "light" | "system";
 export const THEME_KEY = "synapse_theme";
 
-const THEME_COLORS = { dark: "#262624", light: "#faf9f5" };
+const THEME_COLORS = { dark: "#121110", light: "#f1eee6" };
+
+// Live (moving) background. On by default; saved per device.
+export const LIVE_BG_KEY = "synapse_live_bg";
+
+export function getLiveBackground(): boolean {
+  try {
+    return localStorage.getItem(LIVE_BG_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+export function setLiveBackground(on: boolean) {
+  try {
+    localStorage.setItem(LIVE_BG_KEY, on ? "on" : "off");
+  } catch {
+    /* storage unavailable */
+  }
+  document.documentElement.dataset.liveBg = on ? "on" : "off";
+}
 
 export function getTheme(): ThemeChoice {
   try {
@@ -44,4 +64,4 @@ export function watchSystemTheme() {
 }
 
 /** Runs before the page paints, so a light-theme user never sees a dark flash. */
-export const THEME_BOOT_SCRIPT = `try{var t=localStorage.getItem("${THEME_KEY}");var l=t==="light"||(t==="system"&&matchMedia("(prefers-color-scheme: light)").matches);if(l){document.documentElement.classList.remove("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","${THEME_COLORS.light}")}}catch(e){}`;
+export const THEME_BOOT_SCRIPT = `try{if(localStorage.getItem("${LIVE_BG_KEY}")==="off")document.documentElement.dataset.liveBg="off"}catch(e){}try{var t=localStorage.getItem("${THEME_KEY}");var l=t==="light"||(t==="system"&&matchMedia("(prefers-color-scheme: light)").matches);if(l){document.documentElement.classList.remove("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","${THEME_COLORS.light}")}}catch(e){}`;

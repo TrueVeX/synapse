@@ -8,8 +8,11 @@ import {
   Check,
   ChevronDown,
   Copy,
+  CornerDownRight,
   FileText,
   Globe,
+  Layers,
+  Plus,
   ImageIcon,
   Lightbulb,
   RotateCcw,
@@ -108,7 +111,7 @@ export function UserMessage({ message }: { message: UIMessage }) {
           {attachments.map((name, index) => (
             <span
               key={`${name}-${index}`}
-              className="inline-flex max-w-[16rem] items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground"
+              className="glass inline-flex max-w-[16rem] items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground"
             >
               {isImageName(name) ? <ImageIcon className="size-4 shrink-0" /> : <FileText className="size-4 shrink-0" />}
               <span className="truncate">{name}</span>
@@ -116,7 +119,7 @@ export function UserMessage({ message }: { message: UIMessage }) {
           ))}
         </div>
       )}
-      <div className="max-w-full rounded-2xl rounded-br-md bg-popover px-4 py-2.5 shadow-sm shadow-black/20">
+      <div className="glass glass-sheen max-w-full rounded-[22px] rounded-br-md px-4 py-2.5">
         <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-card-foreground">
           {message.content}
         </p>
@@ -128,70 +131,88 @@ export function UserMessage({ message }: { message: UIMessage }) {
   );
 }
 
-function WebSearchBlock({ search, sources }: { search: SearchState; sources: Source[] }) {
-  const [open, setOpen] = useState(false);
-
-  if (search.state === "searching") {
+function Favicon({ url }: { url: string }) {
+  const domain = domainOf(url);
+  const [failed, setFailed] = useState(false);
+  if (failed || !domain) {
     return (
-      <div className="mb-4 inline-flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-1.5 text-sm text-muted-foreground" role="status">
-        <Globe className="size-4 animate-pulse text-primary" />
-        <ShiningText text="Searching the web..." />
-      </div>
+      <span className="grid size-4 shrink-0 place-items-center rounded-[5px] bg-muted text-[9px] font-semibold uppercase text-muted-foreground">
+        {domain.charAt(0) || "?"}
+      </span>
     );
   }
-
-  const label =
-    search.state === "error" ? "Web search unavailable" : sources.length ? "Searched the web" : "No web results";
-
   return (
-    <div className="mb-4">
-      <button
-        type="button"
-        onClick={() => sources.length && setOpen((value) => !value)}
-        className={cn(
-          "inline-flex items-center gap-2 rounded-xl border border-border bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors",
-          sources.length > 0 && "hover:bg-accent hover:text-foreground",
-        )}
-        aria-expanded={open}
-        title={search.error ?? search.query}
-      >
-        <Globe className="size-4" />
-        <span>{label}</span>
-        {sources.length > 0 && <span className="text-xs opacity-70">{sources.length} results</span>}
-        {sources.length > 0 && (
-          <ChevronDown className={cn("size-4 transition-transform duration-200", open && "rotate-180")} />
-        )}
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: EASE }}
-            className="overflow-hidden"
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`}
+      alt=""
+      width={16}
+      height={16}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="size-4 shrink-0 rounded-[4px]"
+    />
+  );
+}
+
+/** Perplexity-style row of source cards that scrolls sideways. */
+function SourceCards({ sources }: { sources: Source[] }) {
+  return (
+    <div className="source-row mb-4">
+      {sources.map((source, index) => (
+        <a
+          key={`${source.url}-${index}`}
+          href={source.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="glass flex w-44 shrink-0 flex-col justify-between gap-2 rounded-2xl p-3 transition-transform hover:-translate-y-0.5 active:scale-[0.98] sm:w-48"
+        >
+          <span className="line-clamp-2 text-[13px] leading-snug text-card-foreground">{source.title}</span>
+          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Favicon url={source.url} />
+            <span className="truncate">{domainOf(source.url)}</span>
+            <span className="ml-auto shrink-0 opacity-70">{index + 1}</span>
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/** Full list for the Sources tab, with a short excerpt from each page. */
+function SourceList({ sources }: { sources: Source[] }) {
+  return (
+    <ol className="space-y-2">
+      {sources.map((source, index) => (
+        <li key={`${source.url}-${index}`}>
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="glass block rounded-2xl p-3.5 transition-colors hover:bg-accent"
           >
-            <ol className="mt-2 max-w-xl space-y-0.5 rounded-xl border border-border bg-card/40 p-1.5">
-              {sources.map((source, index) => (
-                <li key={`${source.url}-${index}`}>
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-accent"
-                  >
-                    <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted text-[11px] font-semibold uppercase text-muted-foreground">
-                      {domainOf(source.url).charAt(0)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-foreground">{source.title}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">{domainOf(source.url)}</span>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Favicon url={source.url} />
+              <span className="truncate">{domainOf(source.url)}</span>
+              <span className="ml-auto shrink-0">{index + 1}</span>
+            </span>
+            <span className="mt-1.5 block font-medium leading-snug text-card-foreground">{source.title}</span>
+            {source.content && (
+              <span className="mt-1 line-clamp-2 block text-[13px] leading-relaxed text-muted-foreground">{source.content}</span>
+            )}
+          </a>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function SearchingPill({ query }: { query?: string }) {
+  return (
+    <div className="glass-pill mb-4 inline-flex max-w-full items-center gap-2 px-3.5 py-1.5 text-sm text-muted-foreground" role="status">
+      <Globe className="size-4 shrink-0 animate-pulse text-primary" />
+      <ShiningText text="Searching the web..." />
+      {query && <span className="hidden truncate text-xs opacity-70 sm:inline">{query}</span>}
     </div>
   );
 }
@@ -241,9 +262,12 @@ type AssistantMessageProps = {
   onRetry: () => void;
   /** Settings → Show thinking. */
   showThinking?: boolean;
+  /** Follow-up questions shown under the latest answer. */
+  related?: string[];
+  onAsk?: (question: string) => void;
 };
 
-export function AssistantMessage({ message, isLast, canRetry, onRetry, showThinking = true }: AssistantMessageProps) {
+export function AssistantMessage({ message, isLast, canRetry, onRetry, showThinking = true, related, onAsk }: AssistantMessageProps) {
   const shown = useSmoothText(message.content, Boolean(message.animate));
   const generating = message.status === "pending" || message.status === "streaming";
   const revealing = generating || shown.length < message.content.length;
@@ -251,6 +275,9 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry, showThink
   const thinkingShown = showThinking && Boolean(message.thinking);
   const waitingForWords = generating && !message.content && !searching && !thinkingShown;
   const thinkingActive = generating && !message.content && Boolean(message.thinking);
+  const sources = message.sources ?? [];
+  const hasSources = sources.length > 0 && message.search?.state !== "searching";
+  const [tab, setTab] = useState<"answer" | "sources">("answer");
 
   return (
     <motion.div
@@ -259,9 +286,39 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry, showThink
       transition={{ duration: 0.3, ease: EASE }}
       className="group/assistant"
     >
-      {message.search && message.search.state !== "off" && (
-        <WebSearchBlock search={message.search} sources={message.sources ?? []} />
+      {message.search?.state === "searching" && <SearchingPill query={message.search.query} />}
+
+      {hasSources && (
+        <div role="tablist" aria-label="Answer views" className="glass-pill mb-3 inline-flex items-center gap-1 p-1">
+          {(["answer", "sources"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => setTab(value)}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors",
+                tab === value ? "bg-foreground/90 text-background" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {value === "answer" ? <Sparkles className="size-3.5" /> : <Layers className="size-3.5" />}
+              {value === "answer" ? "Answer" : `Sources · ${sources.length}`}
+            </button>
+          ))}
+        </div>
       )}
+      {(message.search?.state === "error" || (message.search?.state === "done" && !hasSources)) && (
+        <p className="mb-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Globe className="size-3.5" /> {message.search?.state === "error" ? "Web search unavailable" : "No web results"}
+        </p>
+      )}
+
+      {hasSources && tab === "sources" ? (
+        <SourceList sources={sources} />
+      ) : (
+      <>
+      {hasSources && <SourceCards sources={sources} />}
 
       {thinkingShown && <ThinkingBlock message={message} active={thinkingActive} />}
 
@@ -275,6 +332,8 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry, showThink
         <div className="synapse-prose">
           <Markdown text={shown} sources={message.sources} />
         </div>
+      )}
+      </>
       )}
 
       {message.status === "error" && (
@@ -317,6 +376,33 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry, showThink
           </div>
         )}
       </div>
+
+      {isLast && !revealing && related && related.length > 0 && onAsk && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: EASE }}
+          className="mt-4"
+        >
+          <p className="mb-2 flex items-center gap-2 text-sm font-medium text-card-foreground">
+            <CornerDownRight className="size-4 text-primary" /> Related
+          </p>
+          <ul className="glass divide-y divide-border overflow-hidden rounded-2xl">
+            {related.map((question) => (
+              <li key={question}>
+                <button
+                  type="button"
+                  onClick={() => onAsk(question)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[15px] text-foreground transition-colors hover:bg-accent active:bg-accent"
+                >
+                  <span>{question}</span>
+                  <Plus className="size-4 shrink-0 text-primary" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      )}
     </motion.div>
   );
 }

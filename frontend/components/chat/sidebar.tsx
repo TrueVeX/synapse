@@ -458,7 +458,7 @@ function SidebarPanel({
       </nav>
 
       {props.billing && (
-        <div className="mx-2 mb-2 rounded-xl border border-border bg-background/40 p-3">
+        <div className="glass mx-2 mb-2 rounded-2xl p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-card-foreground">
               {props.billing.plan !== "free" && <Sparkles className="size-3.5 text-primary" />}
@@ -532,7 +532,7 @@ export function Sidebar(props: SidebarProps) {
       {/* Desktop: full sidebar or a slim rail */}
       <aside
         className={cn(
-          "hidden shrink-0 overflow-hidden border-r border-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] md:block",
+          "glass glass-sheen my-2 ml-2 hidden shrink-0 overflow-hidden rounded-[22px] transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] md:block",
           props.collapsed ? "w-14" : "w-72",
         )}
       >
@@ -544,12 +544,12 @@ export function Sidebar(props: SidebarProps) {
         {mobileOpen && (
           <motion.div className="fixed inset-0 z-50 md:hidden" initial="closed" animate="open" exit="closed">
             <motion.div
-              className="absolute inset-0 bg-black/60"
+              className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
               variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
               onClick={onCloseMobile}
             />
             <motion.aside
-              className="absolute inset-y-0 left-0 max-w-[85vw] border-r border-border bg-sidebar shadow-2xl"
+              className="glass-strong absolute inset-y-2 left-2 max-w-[85vw] overflow-hidden rounded-[24px]"
               variants={{ open: { x: 0 }, closed: { x: "-100%" } }}
               transition={{ duration: 0.28, ease: EASE }}
             >

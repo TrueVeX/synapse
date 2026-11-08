@@ -307,10 +307,10 @@ export default function PricingPage() {
   }
 
   return (
-    <main className="min-h-dvh overflow-x-clip bg-background text-foreground">
+    <main className="min-h-dvh overflow-x-clip text-foreground">
       {/* A plain block (overflow-x-clip, no scroll-chaining limits) so the page itself
           scrolls: touch scrolling on Android stopped at this element before. */}
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header className="glass sticky top-0 z-30 border-x-0 border-t-0 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
             <SynapseMark size={22} />

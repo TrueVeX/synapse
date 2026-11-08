@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { LiveBackground } from "@/components/chat/live-background";
 
 // Sans-serif for the interface, serif for the greeting and AI answers.
 const sans = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -21,7 +22,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#262624",
+  themeColor: "#121110",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,7 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <LiveBackground />
+        {children}
+      </body>
     </html>
   );
 }

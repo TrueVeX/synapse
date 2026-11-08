@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Square } from "lucide-react";
+import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Square, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* --- ICONS --- */
@@ -201,7 +201,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ models, selectedModel, on
             </button>
 
             {isOpen && (
-                <div className="absolute bottom-full right-0 mb-2 w-[260px] bg-white dark:bg-[#212121] border border-[#DDDDDD] dark:border-[#30302E] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col p-1.5 animate-fade-in origin-bottom-right">
+                <div className="glass-strong absolute bottom-full right-0 mb-2 w-[260px] rounded-2xl overflow-hidden z-50 flex flex-col p-1.5 animate-fade-in origin-bottom-right">
                     {models.map(model => (
                         <button
                             type="button"
@@ -292,6 +292,11 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const [selectedModel, setSelectedModel] = useState(defaultModel ?? models[0]?.id ?? "");
     const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
+    // Voice input (browser speech recognition; hidden where unsupported)
+    const [voiceSupported, setVoiceSupported] = useState(false);
+    const [listening, setListening] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognitionRef = useRef<any>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,6 +307,37 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
         isTouchRef.current = window.matchMedia("(pointer: coarse)").matches;
         if (!isTouchRef.current) textareaRef.current?.focus();
     }, []);
+
+    useEffect(() => {
+        setVoiceSupported("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+        return () => recognitionRef.current?.abort?.();
+    }, []);
+
+    const toggleVoice = () => {
+        if (listening) {
+            recognitionRef.current?.stop();
+            return;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!Recognition) return;
+        const recognition = new Recognition();
+        recognition.lang = navigator.language || "en-IN";
+        recognition.interimResults = true;
+        recognition.continuous = false;
+        const before = message ? message.replace(/\s*$/, " ") : "";
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recognition.onresult = (event: any) => {
+            let text = "";
+            for (let i = 0; i < event.results.length; i++) text += event.results[i][0].transcript;
+            setMessage(before + text);
+        };
+        recognition.onend = () => setListening(false);
+        recognition.onerror = () => setListening(false);
+        recognitionRef.current = recognition;
+        setListening(true);
+        recognition.start();
+    };
 
     // Auto-resize textarea
     useEffect(() => {
@@ -414,10 +450,9 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
         >
             {/* Main Container - matching the inspected element structure */}
             <div className={`
-                !box-content flex flex-col mx-0 items-stretch transition-all duration-200 relative z-10 rounded-2xl cursor-text border border-bg-300 dark:border-transparent
-                shadow-[0_0_15px_rgba(0,0,0,0.08)] hover:shadow-[0_0_20px_rgba(0,0,0,0.12)]
-                focus-within:shadow-[0_0_25px_rgba(0,0,0,0.15)]
-                bg-white dark:bg-[#30302E] font-sans antialiased
+                glass-strong glass-sheen !box-content flex flex-col mx-0 items-stretch transition-all duration-200 relative z-10 rounded-[26px] cursor-text
+                focus-within:ring-1 focus-within:ring-primary/40
+                font-sans antialiased
             `}>
 
                 <div className="flex flex-col px-3 pt-3 pb-2 gap-2">
@@ -475,6 +510,20 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
                                 <Icons.Plus className="w-5 h-5" />
                             </button>
 
+                            {/* Voice input */}
+                            {voiceSupported && (
+                                <button
+                                    type="button"
+                                    onClick={toggleVoice}
+                                    className={`inline-flex items-center justify-center relative shrink-0 transition-colors duration-200 h-8 w-8 rounded-full active:scale-95 ${listening ? 'text-white bg-red-500/90 animate-pulse' : 'text-text-400 hover:text-text-200 hover:bg-bg-200'}`}
+                                    aria-pressed={listening}
+                                    aria-label={listening ? "Stop listening" : "Speak your question"}
+                                    title={listening ? "Stop listening" : "Speak your question"}
+                                >
+                                    <Mic className="w-[18px] h-[18px]" />
+                                </button>
+                            )}
+
                             {/* Extended Thinking Button - Compact & Subtle */}
                             <div className="flex shrink min-w-8 !shrink-0">
                                 <button
@@ -514,7 +563,7 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
                                 {isStreaming ? (
                                 <button
                                     onClick={onStop}
-                                    className="inline-flex items-center justify-center relative shrink-0 transition-colors !h-8 !w-8 !rounded-xl active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+                                    className="inline-flex items-center justify-center relative shrink-0 transition-colors !h-9 !w-9 !rounded-full active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
                                     type="button"
                                     aria-label="Stop response"
                                     title="Stop response"
@@ -526,7 +575,7 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
                                     onClick={handleSend}
                                     disabled={!hasContent}
                                     className={`
-                                        inline-flex items-center justify-center relative shrink-0 transition-colors h-8 w-8 rounded-md active:scale-95 !rounded-xl !h-8 !w-8
+                                        inline-flex items-center justify-center relative shrink-0 transition-colors h-8 w-8 rounded-md active:scale-95 !rounded-full !h-9 !w-9
                                         ${hasContent
                                             ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md'
                                             : 'bg-primary/30 text-primary-foreground/60 cursor-default'}

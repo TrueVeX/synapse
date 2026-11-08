@@ -163,7 +163,7 @@ export function MobileCheckout({
               aria-checked={active}
               onClick={() => setSelected(plan.id)}
               className={cn(
-                "w-full rounded-2xl border-2 bg-card p-4 text-left transition-colors",
+                "glass w-full rounded-3xl border-2 p-4 text-left transition-colors",
                 active ? "border-primary" : "border-border",
               )}
             >
@@ -236,7 +236,7 @@ export function MobileCheckout({
       </p>
 
       {/* Pinned pay bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+      <div className="glass-strong fixed inset-x-0 bottom-0 z-40 rounded-t-3xl border-b-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
         <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>
             SYNAPSE {choice.name} · {billing === "monthly" ? "Monthly" : "Yearly"}

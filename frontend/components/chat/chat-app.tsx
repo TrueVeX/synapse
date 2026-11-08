@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDown, FileSearch, GraduationCap, Menu, Scale, Search, Sparkles, SquarePen } from "lucide-react";
+import { ArrowDown, FileSearch, GraduationCap, House, Library, Menu, Scale, Search, Settings2, Sparkles, SquarePen } from "lucide-react";
 import ClaudeChatInput, { type ChatInputSubmit, type Model } from "@/components/ui/claude-style-chat-input";
 import {
   ApiError,
@@ -134,7 +134,7 @@ function fromStored(message: StoredMessage): UIMessage {
 
 function Splash() {
   return (
-    <div className="grid h-dvh place-items-center bg-background">
+    <div className="grid h-dvh place-items-center">
       <SynapseMark size={40} animate title="Loading SYNAPSE" />
     </div>
   );
@@ -142,7 +142,7 @@ function Splash() {
 
 function BootError({ message, onRetry, onSignOut }: { message: string; onRetry: () => void; onSignOut: () => void }) {
   return (
-    <div className="grid h-dvh place-items-center bg-background p-6">
+    <div className="grid h-dvh place-items-center p-6">
       <div className="max-w-md text-center">
         <SynapseMark size={36} className="mx-auto mb-5" />
         <h1 className="font-serif text-2xl text-card-foreground">SYNAPSE can&rsquo;t load right now</h1>
@@ -190,6 +190,8 @@ export default function ChatApp() {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [languages, setLanguages] = useState<string[] | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Follow-up suggestions for the latest answer ("Related").
+  const [related, setRelated] = useState<{ key: string; questions: string[] } | null>(null);
 
   const activeIdRef = useRef<string | null>(null);
   const streamingRef = useRef(false);
@@ -294,6 +296,7 @@ export default function ChatApp() {
       setActiveId(id);
       setMobileOpen(false);
       setOpenSuggestion(null);
+      setRelated(null);
       setShowJump(false);
       lastFilesRef.current = [];
       stickToBottomRef.current = true;
@@ -391,6 +394,7 @@ export default function ChatApp() {
       const { query, mode, files, regenerate, userMessage } = options;
       const assistantKey = newKey();
       const requestId = newRequestId();
+      setRelated(null);
       let streamConversationId = activeIdRef.current;
 
       setMessages((previous) => {
@@ -485,6 +489,15 @@ export default function ChatApp() {
             break;
           case "done":
             update((m) => ({ ...m, id: event.message_id, status: "done" }));
+            // Ask for "Related" follow-up questions in the background (no credits).
+            api<{ questions: string[] }>("/api/chat/related", {
+              method: "POST",
+              body: JSON.stringify({ conversation_id: event.conversation_id }),
+            })
+              .then((result) => {
+                if (result.questions?.length) setRelated({ key: assistantKey, questions: result.questions });
+              })
+              .catch(() => {});
             break;
           case "stopped":
             update((m) => ({ ...m, status: "stopped" }));
@@ -561,6 +574,13 @@ export default function ChatApp() {
       });
     },
     [runStream],
+  );
+
+  // Tapping a "Related" question asks it in the same chat and mode.
+  const askFollowUp = useCallback(
+    (question: string) =>
+      send({ message: question, files: [], pastedContent: [], model: lastModeRef.current, isThinkingEnabled: false }),
+    [send],
   );
 
   const stop = useCallback(() => {
@@ -696,7 +716,7 @@ export default function ChatApp() {
   );
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+    <div className="flex h-dvh overflow-hidden text-foreground">
       <Sidebar
         user={user}
         conversations={conversations}
@@ -736,7 +756,7 @@ export default function ChatApp() {
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:hidden"
+            className="glass-pill grid size-10 place-items-center text-muted-foreground transition-colors hover:text-foreground md:hidden"
             aria-label="Open sidebar"
           >
             <Menu className="size-5" />
@@ -759,7 +779,7 @@ export default function ChatApp() {
           <button
             type="button"
             onClick={() => navigate(null)}
-            className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:hidden"
+            className="glass-pill grid size-10 place-items-center text-muted-foreground transition-colors hover:text-foreground md:hidden"
             aria-label="New chat"
           >
             <SquarePen className="size-[18px]" />
@@ -785,6 +805,8 @@ export default function ChatApp() {
                             isLast={index === messages.length - 1}
                             canRetry={!isStreaming}
                             onRetry={retry}
+                            related={related?.key === message.key ? related.questions : undefined}
+                            onAsk={askFollowUp}
                             showThinking={settings.show_thinking}
                           />
                         ),
@@ -889,9 +911,36 @@ export default function ChatApp() {
                 </AnimatePresence>
               </div>
             </div>
-            <p className="pb-[max(1rem,env(safe-area-inset-bottom))] pt-6 text-center text-xs text-muted-foreground">
+            <p className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-6 text-center text-xs text-muted-foreground md:pb-[max(1rem,env(safe-area-inset-bottom))]">
               SYNAPSE · Created by <span className="text-foreground">Revoori Ashwath Reddy</span> · <span className="text-foreground">HumanForm Studios</span>
             </p>
+
+            {/* Phones: bottom tab bar on the home screen */}
+            <nav
+              aria-label="SYNAPSE"
+              className="glass-strong glass-sheen fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 grid grid-cols-4 rounded-[26px] p-1.5 md:hidden"
+            >
+              {[
+                { label: "Home", icon: House, onClick: () => navigate(null), active: true },
+                { label: "Library", icon: Library, onClick: () => setMobileOpen(true) },
+                { label: "Plans", icon: Sparkles, onClick: () => router.push("/pricing") },
+                { label: "Settings", icon: Settings2, onClick: () => setSettingsOpen(true) },
+              ].map(({ label, icon: Icon, onClick, active }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={onClick}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex h-14 flex-col items-center justify-center gap-1 rounded-[20px] text-[11px] font-medium transition-colors active:scale-95",
+                    active ? "bg-foreground/10 text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className={cn("size-5", active && "text-primary")} />
+                  {label}
+                </button>
+              ))}
+            </nav>
           </div>
         )}
 
@@ -903,7 +952,7 @@ export default function ChatApp() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
               transition={{ duration: 0.2, ease: EASE }}
-              className="fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 rounded-xl border border-border bg-popover px-4 py-2.5 text-sm text-popover-foreground shadow-2xl shadow-black/40"
+              className="glass-strong fixed bottom-24 left-1/2 z-[70] -translate-x-1/2 rounded-full px-5 py-2.5 text-sm text-popover-foreground md:bottom-6"
             >
               {toast}
             </motion.div>

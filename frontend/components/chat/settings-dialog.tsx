@@ -28,7 +28,7 @@ import {
   type User,
   type UserSettings,
 } from "@/lib/api";
-import { getTheme, setTheme, type ThemeChoice } from "@/lib/theme";
+import { getLiveBackground, getTheme, setLiveBackground, setTheme, type ThemeChoice } from "@/lib/theme";
 import { initialsOf } from "./sidebar";
 
 const EASE = [0.2, 0, 0, 1] as const;
@@ -238,6 +238,8 @@ function GeneralTab({
 }) {
   const [theme, setThemeState] = useState<ThemeChoice>("dark");
   useEffect(() => setThemeState(getTheme()), []);
+  const [liveBg, setLiveBg] = useState(true);
+  useEffect(() => setLiveBg(getLiveBackground()), []);
 
   const themes: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [
     { id: "light", label: "Light", icon: Sun },
@@ -270,6 +272,16 @@ function GeneralTab({
               </button>
             ))}
           </div>
+        </Row>
+        <Row label="Live background" description="Slowly moving colours behind the app. Turn off to save battery. Saved on this device.">
+          <Switch
+            checked={liveBg}
+            onCheckedChange={(on) => {
+              setLiveBackground(on);
+              setLiveBg(on);
+            }}
+            aria-label="Live background"
+          />
         </Row>
       </Section>
 
