@@ -155,7 +155,7 @@ function layout({ page, pages, sidebar, prev, next }) {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}" />
-<meta name="theme-color" content="#1f1e1d" />
+<meta name="theme-color" content="#121110" />
 <meta name="google-site-verification" content="7g5JZI04aYb2aEU2x2Tzd5oRYhu4O_zGuJpKiL6gwS8" />
 <link rel="canonical" href="${SITE.url}${urlFor(slug)}" />
 <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
@@ -171,6 +171,7 @@ function layout({ page, pages, sidebar, prev, next }) {
 <link rel="stylesheet" href="/assets/docs.css" />
 </head>
 <body>
+<div class="live-bg" aria-hidden="true"><span></span><span></span><span></span></div>
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
   <div class="top__inner">

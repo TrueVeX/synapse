@@ -551,3 +551,58 @@ body { -webkit-tap-highlight-color: transparent; }
   .mobile-cta .btn { min-height: 42px; padding: 0 16px; font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) { .mobile-cta { transition: none; } }
+
+/* =====================================================================
+   Liquid glass + live background (matches the SYNAPSE app)
+   ===================================================================== */
+:root {
+  --glass: rgba(255, 255, 255, 0.05);
+  --glass-strong: rgba(28, 27, 25, 0.7);
+  --glass-line: rgba(255, 255, 255, 0.09);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-shadow: 0 18px 50px -18px rgba(0, 0, 0, 0.7);
+}
+body { background: #121110; }
+.live-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #121110; }
+.live-bg span {
+  position: absolute; border-radius: 50%; filter: blur(70px); will-change: transform;
+  animation: live-drift 26s ease-in-out infinite alternate;
+}
+.live-bg span:nth-child(1) { width: 55vmax; height: 55vmax; left: -12vmax; top: -16vmax; background: radial-gradient(circle, rgba(217, 119, 87, 0.34), transparent 65%); }
+.live-bg span:nth-child(2) { width: 50vmax; height: 50vmax; right: -14vmax; top: 30vh; background: radial-gradient(circle, rgba(156, 135, 245, 0.26), transparent 65%); animation-duration: 32s; animation-delay: -8s; }
+.live-bg span:nth-child(3) { width: 46vmax; height: 46vmax; left: 15vw; bottom: -20vmax; background: radial-gradient(circle, rgba(64, 150, 170, 0.2), transparent 65%); animation-duration: 38s; animation-delay: -14s; }
+.live-bg span:nth-child(4) { width: 30vmax; height: 30vmax; left: 50vw; top: 5vh; background: radial-gradient(circle, rgba(200, 120, 70, 0.18), transparent 65%); animation-duration: 22s; animation-delay: -4s; }
+@keyframes live-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(6vw, 4vh, 0) scale(1.08); }
+  66% { transform: translate3d(-4vw, 7vh, 0) scale(0.94); }
+  100% { transform: translate3d(3vw, -5vh, 0) scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) { .live-bg span { animation: none; } }
+@media (max-width: 640px) { .live-bg span { filter: blur(56px); } }
+
+/* Frosted surfaces */
+.chat, .card, .dl, .loop__step, .settings-mock, .table-wrap, .update, .billing-toggle,
+.logos li, .plan, .facts, .checks li, .footer {
+  background: var(--glass) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border-color: var(--glass-line) !important;
+}
+.chat, .card, .dl, .loop__step, .settings-mock, .table-wrap, .plan {
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow);
+}
+.card--accent, .plan--featured { background: linear-gradient(160deg, rgba(217, 119, 87, 0.14), rgba(156, 135, 245, 0.06) 60%), var(--glass) !important; border-color: rgba(217, 119, 87, 0.45) !important; }
+.facts { border-radius: 22px; border: 1px solid var(--glass-line); }
+.checks li { border-radius: 14px; margin-bottom: 8px; padding-right: 14px; border: 1px solid var(--glass-line); }
+.checks li:first-child { border-top: 1px solid var(--glass-line); }
+.chat__bar { background: rgba(255, 255, 255, 0.03); border-color: var(--glass-line); }
+.msg--user, .pill, .sources span, .card__icon, .dl__icon { background: rgba(255, 255, 255, 0.08); }
+.nav { background: rgba(18, 17, 16, 0.55); }
+.nav__links a:hover, .btn--ghost:hover { background: rgba(255, 255, 255, 0.08); }
+.tabs [role="tab"] { background: rgba(255, 255, 255, 0.07); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--glass-line); }
+.btn--ghost { background: rgba(255, 255, 255, 0.04); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.hero__stage { background: radial-gradient(60% 70% at 30% 40%, rgba(217, 119, 87, 0.16), transparent 70%), radial-gradient(50% 60% at 75% 65%, rgba(156, 135, 245, 0.14), transparent 70%), rgba(14, 13, 12, 0.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow); }
+.mobile-cta { background: var(--glass-strong) !important; box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow) !important; }
+.footer { background: rgba(14, 13, 12, 0.45) !important; border-left: 0; border-right: 0; border-bottom: 0; }
+.checksum code { background: rgba(0, 0, 0, 0.25); }
