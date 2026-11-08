@@ -3,6 +3,7 @@
 // Floating paths background (21st.dev/@bundui/components/floating-paths),
 // adapted for SYNAPSE:
 // - fills the whole screen behind the app instead of a hero section
+// - 16 parallel lines that never cross (the original has 72 crossing lines)
 // - drawn on a canvas at 30fps instead of animating 72 SVG paths with
 //   framer-motion, which repainted the whole page (and every glass blur)
 //   on every frame
@@ -22,11 +23,20 @@ const rand = (n: number) => {
   return x - Math.floor(x);
 };
 
-function pathData(i: number, position: number) {
-  const s = i * 5 * position;
+// 16 copies of one curve, each shifted up and to the right by the same step.
+// The curve only ever moves right and down, so shifted copies can never
+// cross (checked: 0 of 120 pairs intersect); they stay >= 12 units apart,
+// much more than their width.
+const LINES = 16;
+const STEP_X = 12;
+const STEP_Y = -14;
+
+function pathData(i: number) {
+  const x = i * STEP_X;
+  const y = i * STEP_Y;
   return (
-    `M-${380 - s} -${189 + i * 6}C-${380 - s} -${189 + i * 6} -${312 - s} ${216 - i * 6} ${152 - s} ${343 - i * 6}` +
-    `C${616 - s} ${470 - i * 6} ${684 - s} ${875 - i * 6} ${684 - s} ${875 - i * 6}`
+    `M${-380 + x} ${-189 + y}C${-380 + x} ${-189 + y} ${-312 + x} ${216 + y} ${152 + x} ${343 + y}` +
+    `C${616 + x} ${470 + y} ${684 + x} ${875 + y} ${684 + x} ${875 + y}`
   );
 }
 
@@ -39,20 +49,18 @@ export function FloatingPaths({ className }: { className?: string }) {
     if (!canvas || !ctx) return;
 
     const measure = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    const paths = [1, -1].flatMap((position) =>
-      Array.from({ length: 36 }, (_, i) => {
-        const d = pathData(i, position);
-        measure.setAttribute("d", d);
-        return {
-          shape: new Path2D(d),
-          length: measure.getTotalLength(),
-          width: 0.5 + i * 0.03,
-          opacity: 0.1 + i * 0.03,
-          duration: (20 + rand(i + position * 100) * 10) * 1000,
-          phase: rand(i * 7 + position * 31),
-        };
-      }),
-    );
+    const paths = Array.from({ length: LINES }, (_, i) => {
+      const d = pathData(i);
+      measure.setAttribute("d", d);
+      return {
+        shape: new Path2D(d),
+        length: measure.getTotalLength(),
+        width: 0.6 + i * 0.06,
+        opacity: 0.15 + i * 0.05,
+        duration: (20 + rand(i + 100) * 10) * 1000,
+        phase: rand(i * 7 + 31),
+      };
+    });
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let width = 0, height = 0, dpr = 1, scale = 1, ox = 0, oy = 0, last = -1e9, raf = 0, timer = 0;

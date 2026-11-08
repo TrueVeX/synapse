@@ -1,5 +1,5 @@
 // Floating paths background (21st.dev/@bundui/components/floating-paths):
-// two mirrored sets of 36 curved lines that slowly flow. Drawn on a canvas at
+// 16 parallel curved lines that slowly flow and never cross. Drawn on a canvas at
 // 30fps (animating SVG strokes repaints the whole page every frame and made
 // the glass panels stutter). Pauses when the tab is hidden, with reduced
 // motion, or when the live background is turned off.
@@ -11,24 +11,27 @@
   var VB_W = 696, VB_H = 316;
   function rand(n) { var x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); }
 
+  // 16 copies of one curve, each shifted up and to the right by the same
+  // step. The curve only ever moves right and down, so shifted copies can
+  // never cross (checked: 0 of 120 pairs intersect); they stay >= 12 units
+  // apart, much more than their width.
+  var LINES = 16, STEP_X = 12, STEP_Y = -14;
   var measure = document.createElementNS(NS, "path");
   var paths = [];
-  [1, -1].forEach(function (position) {
-    for (var i = 0; i < 36; i++) {
-      var s = i * 5 * position;
-      var d = "M-" + (380 - s) + " -" + (189 + i * 6) + "C-" + (380 - s) + " -" + (189 + i * 6) + " -" + (312 - s) + " " + (216 - i * 6) + " " + (152 - s) + " " + (343 - i * 6) +
-        "C" + (616 - s) + " " + (470 - i * 6) + " " + (684 - s) + " " + (875 - i * 6) + " " + (684 - s) + " " + (875 - i * 6);
-      measure.setAttribute("d", d);
-      paths.push({
-        shape: new Path2D(d),
-        length: measure.getTotalLength(),
-        width: 0.5 + i * 0.03,
-        opacity: 0.1 + i * 0.03,
-        duration: (20 + rand(i + position * 100) * 10) * 1000,
-        phase: rand(i * 7 + position * 31)
-      });
-    }
-  });
+  for (var i = 0; i < LINES; i++) {
+    var x = i * STEP_X, y = i * STEP_Y;
+    var d = "M" + (-380 + x) + " " + (-189 + y) + "C" + (-380 + x) + " " + (-189 + y) + " " + (-312 + x) + " " + (216 + y) + " " + (152 + x) + " " + (343 + y) +
+      "C" + (616 + x) + " " + (470 + y) + " " + (684 + x) + " " + (875 + y) + " " + (684 + x) + " " + (875 + y);
+    measure.setAttribute("d", d);
+    paths.push({
+      shape: new Path2D(d),
+      length: measure.getTotalLength(),
+      width: 0.6 + i * 0.06,
+      opacity: 0.15 + i * 0.05,
+      duration: (20 + rand(i + 100) * 10) * 1000,
+      phase: rand(i * 7 + 31)
+    });
+  }
 
   var canvas = document.createElement("canvas");
   canvas.className = "floating-paths";
