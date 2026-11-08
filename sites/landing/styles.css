@@ -1,18 +1,18 @@
-/* SYNAPSE landing page. Palette and fonts match the SYNAPSE app
-   (Claude theme by @serafimcloud on 21st.dev; Inter + Source Serif 4). */
+/* SYNAPSE landing page. Palette matches the SYNAPSE app
+   (Vercel theme by @serafimcloud on 21st.dev); fonts Inter + Source Serif 4. */
 
 :root {
   color-scheme: dark;
   --bg: #000000;
-  --bg-2: #0d0d0d;
-  --bg-3: #1a1a1a;
-  --bg-4: #262626;
-  --line: #2e2e2e;
+  --bg-2: #0a0a0a;
+  --bg-3: #1d1d1d;
+  --bg-4: #333333;
+  --line: #242424;
   --line-soft: rgba(255, 255, 255, 0.08);
-  --text: #fafafa;
-  --body: #c7c7c7;
-  --muted: #a3a3a3;
-  --primary: #fafafa;
+  --text: #ffffff;
+  --body: #d4d4d4;
+  --muted: #a4a4a4;
+  --primary: #ffffff;
   --primary-2: #d4d4d4;
   --primary-soft: rgba(255, 255, 255, 0.07);
   --violet: #a3a3a3;

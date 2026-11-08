@@ -3,7 +3,7 @@
 export type ThemeChoice = "dark" | "light" | "system";
 export const THEME_KEY = "synapse_theme";
 
-const THEME_COLORS = { dark: "#000000", light: "#ffffff" };
+const THEME_COLORS = { dark: "#000000", light: "#fcfcfc" };
 
 // Live (moving) background. On by default; saved per device.
 export const LIVE_BG_KEY = "synapse_live_bg";
