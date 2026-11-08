@@ -171,7 +171,7 @@ function layout({ page, pages, sidebar, prev, next }) {
 <link rel="stylesheet" href="/assets/docs.css" />
 </head>
 <body>
-<div class="live-bg" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="live-bg" aria-hidden="true"></div>
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
   <div class="top__inner">
@@ -220,7 +220,7 @@ ${html}
   </div>
 </div>
 <script src="/assets/docs.js" defer></script>
-<script src="/assets/particles.js" defer></script>
+<script src="/assets/paths.js" defer></script>
 </body>
 </html>
 `;
