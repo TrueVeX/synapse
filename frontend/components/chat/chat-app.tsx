@@ -405,7 +405,7 @@ export default function ChatApp() {
           content: "",
           status: "pending",
           animate: true,
-          search: { state: "searching", query },
+          // The web-search block appears only if the server actually searches.
         });
         return next;
       });

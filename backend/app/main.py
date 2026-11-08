@@ -874,6 +874,53 @@ def extract_document_text(filename: str, data: bytes):
 # 12. TAVILY WEB SEARCH
 # ============================================================
 
+import re as _re
+
+# Words that mean the answer depends on live or verifiable information.
+_WEB_SIGNALS = _re.compile(
+    r"\b("
+    r"search|look\s*up|google|browse|online|on the (web|internet)|website|web ?site|url|links?|"
+    r"sources?|cite|citations?|references?|according to|"
+    r"latest|recent(ly)?|current(ly)?|today|tonight|yesterday|tomorrow|this (week|month|year)|"
+    r"right now|as of|up to date|news|headlines?|breaking|trending|"
+    r"prices?|how much (does|do|is) .{0,40}cost|stock price|share price|crypto|bitcoin|exchange rate|"
+    r"weather|forecast|live score|scores?|fixtures?|standings|"
+    r"election|elected|polls?|release date|released|launched|announced|"
+    r"who won|who is the (current )?(ceo|president|prime minister|pm|chief|head|owner|founder)|"
+    r"studies|research (on|about|says)|statistics|stats on|data on|survey|journal|"
+    r"compare|comparison|versus|reviews?|best .{0,30} (to buy|in 20\d\d)|"
+    r"20[2-9]\d"
+    r")\b",
+    _re.IGNORECASE,
+)
+
+# Small talk that never needs the web, even as a short follow-up.
+_SMALL_TALK = _re.compile(
+    r"^\s*(hi|hello|hey|hii+|yo|thanks?|thank you|thx|ok(ay)?|cool|nice|great|bye|good (morning|afternoon|evening|night)|"
+    r"how are you|who are you|what('?s| is) your name|who (built|made|created) you)\b",
+    _re.IGNORECASE,
+)
+
+
+def needs_web_search(question: str, search_text: str, mode: str) -> bool:
+    """Decides whether an answer should use live web search.
+
+    Deep research always searches. Otherwise SYNAPSE answers from the model
+    itself and only searches when the question asks for current, sourced or
+    verifiable information (news, prices, "latest", studies, links...).
+    """
+
+    if mode.lower() in ("deep", "deep research"):
+        return True
+    if not TAVILY_API_KEY:
+        return False
+    if _SMALL_TALK.match(question or ""):
+        return False
+    if _re.search(r"https?://|www\.", question or ""):
+        return True
+    return bool(_WEB_SIGNALS.search(search_text or question or ""))
+
+
 def search_web(query: str, mode: str):
 
     if not TAVILY_API_KEY:
@@ -959,7 +1006,26 @@ def build_research_prompt(
     mode: str,
     sources: list,
     document_text: list,
+    searched: bool = True,
 ):
+
+    if not searched:
+        # Answered from the model's own knowledge: no web results, no citations.
+        document_context = (
+            "\n\nUPLOADED DOCUMENTS:\n" + "\n\n".join(document_text)
+            if document_text
+            else ""
+        )
+        instruction = MODE_INSTRUCTIONS.get(mode.lower(), "")
+        return (
+            f"{query}\n\n"
+            + (f"{instruction}\n" if instruction else "")
+            + "Answer from your own knowledge. No web search was used for this "
+            "question, so do not add citation markers like [1] or mention "
+            "searching. If the answer depends on very recent events you can't "
+            "know, say so briefly."
+            + document_context
+        )
 
     source_context = ""
 
@@ -1873,31 +1939,34 @@ async def chat_stream(
                 }
             )
 
-            emit(
-                {
-                    "type": "status",
-                    "stage": "searching",
-                    "query": search_query,
-                }
-            )
+            searched = needs_web_search(user_query, search_query, mode)
 
-            search_error = None
+            if searched:
+                emit(
+                    {
+                        "type": "status",
+                        "stage": "searching",
+                        "query": search_query,
+                    }
+                )
 
-            try:
-                sources = public_sources(search_web(search_query, mode))
-            except HTTPException as exc:
-                search_error = str(exc.detail)
-                sources = []
+                search_error = None
 
-            emit(
-                {
-                    "type": "sources",
-                    "sources": sources,
-                    "error": search_error,
-                    "enabled": bool(TAVILY_API_KEY),
-                    "query": search_query,
-                }
-            )
+                try:
+                    sources = public_sources(search_web(search_query, mode))
+                except HTTPException as exc:
+                    search_error = str(exc.detail)
+                    sources = []
+
+                emit(
+                    {
+                        "type": "sources",
+                        "sources": sources,
+                        "error": search_error,
+                        "enabled": bool(TAVILY_API_KEY),
+                        "query": search_query,
+                    }
+                )
 
             if generation.should_stop():
                 emit({"type": "stopped"})
@@ -1910,6 +1979,7 @@ async def chat_stream(
                 mode,
                 sources,
                 document_text,
+                searched=searched,
             )
 
             messages = [
