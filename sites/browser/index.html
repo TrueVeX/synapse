@@ -21,8 +21,12 @@
     .hero-mark { width: 88px; height: 88px; margin: 0 auto 28px; color: var(--primary); }
     .downloads--2 { grid-template-columns: repeat(2, 1fr); max-width: 900px; margin-left: auto; margin-right: auto; }
     @media (max-width: 760px) { .downloads--2 { grid-template-columns: 1fr; } }
-    .dl__other { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
-    .dl__other a { color: var(--body); }
+    .dl__opts { display: grid; gap: 14px; margin-top: 4px; }
+    .dl__opt { display: grid; gap: 6px; }
+    .dl__caption { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); text-align: center; }
+    .dl__sums { margin-top: auto; padding-top: 12px; display: grid; gap: 6px; }
+    .dl__sums .checksum { margin: 0; padding-top: 0; }
+    .dl__sums .checksum span { min-width: 100%; color: var(--body); }
   </style>
   <script type="application/ld+json">
     {
@@ -102,17 +106,35 @@
             </div>
             <h3>Windows</h3>
             <p class="dl__meta">Windows 10 and 11 · 64-bit · version 1.0.0</p>
-            <a class="btn btn--primary btn--block" href="/windows">Download for Windows <span class="size">162 MB</span></a>
+            <div class="dl__opts">
+              <div class="dl__opt">
+                <a class="btn btn--primary btn--block" href="/windows">Download installer (.exe) <span class="size">111 MB</span></a>
+                <p class="dl__caption">Original version. Installs SYNAPSE Browser with Start menu and desktop shortcuts, and an uninstaller.</p>
+              </div>
+              <div class="dl__opt">
+                <a class="btn btn--ghost btn--block" href="/windows-portable">Download portable (.zip) <span class="size">162 MB</span></a>
+                <p class="dl__caption">Portable version. Nothing to install: unzip and run, even from a USB drive.</p>
+              </div>
+            </div>
             <details class="dl__help">
               <summary>Installing on Windows</summary>
+              <p><strong>Installer:</strong></p>
+              <ol>
+                <li>Open the downloaded <code>SYNAPSE-Browser-Setup.exe</code>.</li>
+                <li>If “Windows protected your PC” appears, choose <strong>More info → Run anyway</strong>. The browser isn't code-signed yet.</li>
+                <li>Follow the steps, then open SYNAPSE Browser from the Start menu or your desktop.</li>
+              </ol>
+              <p><strong>Portable:</strong></p>
               <ol>
                 <li>Right-click the downloaded <code>SYNAPSE-Browser-Windows-x64.zip</code> and choose <strong>Extract All</strong>.</li>
-                <li>Move the <code>SYNAPSE Browser</code> folder somewhere on your fastest drive (an SSD), such as your user folder.</li>
-                <li>Open <code>synapse.exe</code>. If “Windows protected your PC” appears, choose <strong>More info → Run anyway</strong>. The browser isn't code-signed yet.</li>
-                <li>Right-click <code>synapse.exe</code> → <strong>Show more options → Pin to taskbar</strong> to keep it handy.</li>
+                <li>Keep the extracted <code>synapse</code> folder on your fastest drive (an SSD), such as your user folder.</li>
+                <li>Open <code>synapse.exe</code> inside it. If “Windows protected your PC” appears, choose <strong>More info → Run anyway</strong>.</li>
               </ol>
             </details>
-            <p class="checksum">SHA-256 <code>013dfa7b9684871c3ece83256afb9f97cc71cf9a620515c43cb508c4ef36d37a</code> <button type="button" class="copy" data-copy="013dfa7b9684871c3ece83256afb9f97cc71cf9a620515c43cb508c4ef36d37a">Copy</button></p>
+            <div class="dl__sums">
+              <p class="checksum"><span>SHA-256 · installer</span><code>64fe6d3144f3470032334797872b60c24c2bf8c9bddac43cab9c7bfb84c88a2d</code> <button type="button" class="copy" data-copy="64fe6d3144f3470032334797872b60c24c2bf8c9bddac43cab9c7bfb84c88a2d">Copy</button></p>
+              <p class="checksum"><span>SHA-256 · portable</span><code>ef7a56c1c1df78f4f8e7c0a60713e7308eb0b1c3bf088368e97b5736fda8d99d</code> <button type="button" class="copy" data-copy="ef7a56c1c1df78f4f8e7c0a60713e7308eb0b1c3bf088368e97b5736fda8d99d">Copy</button></p>
+            </div>
           </div>
 
           <div class="dl reveal" data-platform="android">
@@ -122,8 +144,20 @@
             </div>
             <h3>Android</h3>
             <p class="dl__meta">Android 8.0 and later · version 1.0.0</p>
-            <a class="btn btn--primary btn--block" href="/android">Download APK <span class="size">99 MB</span></a>
-            <p class="dl__other">For most phones made since 2017. Older 32-bit phone? <a href="/android-32">32-bit APK</a> · Emulator or Chromebook: <a href="/android-x86">x86_64 APK</a></p>
+            <div class="dl__opts">
+              <div class="dl__opt">
+                <a class="btn btn--primary btn--block" href="/android">Download 64-bit APK <span class="size">99 MB</span></a>
+                <p class="dl__caption">For most phones made since 2017.</p>
+              </div>
+              <div class="dl__opt">
+                <a class="btn btn--ghost btn--block" href="/android-32">Download 32-bit APK <span class="size">94 MB</span></a>
+                <p class="dl__caption">For older 32-bit phones.</p>
+              </div>
+              <div class="dl__opt">
+                <a class="btn btn--ghost btn--block" href="/android-x86">Download x86_64 APK <span class="size">105 MB</span></a>
+                <p class="dl__caption">For emulators and Chromebooks.</p>
+              </div>
+            </div>
             <details class="dl__help">
               <summary>Installing on Android</summary>
               <ol>
@@ -133,7 +167,11 @@
                 <li>To make it your default browser: <strong>Settings → Apps → Default apps → Browser app → SYNAPSE Browser</strong>.</li>
               </ol>
             </details>
-            <p class="checksum">SHA-256 <code>d315b4256c2a59ae52a9c37c800e73b7ae1a349d47993346aede803e9c151d99</code> <button type="button" class="copy" data-copy="d315b4256c2a59ae52a9c37c800e73b7ae1a349d47993346aede803e9c151d99">Copy</button></p>
+            <div class="dl__sums">
+              <p class="checksum"><span>SHA-256 · 64-bit</span><code>d315b4256c2a59ae52a9c37c800e73b7ae1a349d47993346aede803e9c151d99</code> <button type="button" class="copy" data-copy="d315b4256c2a59ae52a9c37c800e73b7ae1a349d47993346aede803e9c151d99">Copy</button></p>
+              <p class="checksum"><span>SHA-256 · 32-bit</span><code>0a1baf1a58a6c0c7fdda8fe127941ba815910f60e1fb19bc9e48897fb3a4df6d</code> <button type="button" class="copy" data-copy="0a1baf1a58a6c0c7fdda8fe127941ba815910f60e1fb19bc9e48897fb3a4df6d">Copy</button></p>
+              <p class="checksum"><span>SHA-256 · x86_64</span><code>9c1ed248a5b365d409ec3b506fb3b00f908b7415242a149135da0318c2f405fa</code> <button type="button" class="copy" data-copy="9c1ed248a5b365d409ec3b506fb3b00f908b7415242a149135da0318c2f405fa">Copy</button></p>
+            </div>
           </div>
         </div>
         <p class="downloads__note reveal">Downloads are hosted on <a href="https://github.com/TrueVeX/synapse-browser/releases">GitHub Releases</a>. Check a file's SHA-256 fingerprint to confirm it hasn't been changed.</p>
@@ -185,7 +223,7 @@
           <table class="spec">
             <tbody>
               <tr><th scope="row">Version</th><td>1.0.0</td></tr>
-              <tr><th scope="row">Windows</th><td>Windows 10 or 11, 64-bit · portable zip, about 450 MB unzipped · 4 GB RAM or more recommended</td></tr>
+              <tr><th scope="row">Windows</th><td>Windows 10 or 11, 64-bit · installer or portable zip · about 450 MB of disk space · 4 GB RAM or more recommended</td></tr>
               <tr><th scope="row">Android</th><td>Android 8.0 or later · 64-bit ARM, 32-bit ARM and x86_64 builds</td></tr>
               <tr><th scope="row">Engine</th><td>Gecko, the open-source engine behind Firefox</td></tr>
               <tr><th scope="row">Price</th><td>Free, no account needed</td></tr>

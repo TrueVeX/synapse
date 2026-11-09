@@ -4,7 +4,8 @@
   "trailingSlash": false,
   "redirects": [
     { "source": "/download", "destination": "/#download", "permanent": false },
-    { "source": "/windows", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Windows-x64.zip", "permanent": false },
+    { "source": "/windows", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Setup.exe", "permanent": false },
+    { "source": "/windows-portable", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Windows-x64.zip", "permanent": false },
     { "source": "/android", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Android-arm64.apk", "permanent": false },
     { "source": "/android-32", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Android-armv7.apk", "permanent": false },
     { "source": "/android-x86", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Android-x86_64.apk", "permanent": false },
