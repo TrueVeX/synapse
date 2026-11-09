@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/download", "destination": "/#download", "permanent": false },
+    { "source": "/windows", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Windows-x64.zip", "permanent": false },
+    { "source": "/android", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Android-arm64.apk", "permanent": false },
+    { "source": "/android-32", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Android-armv7.apk", "permanent": false },
+    { "source": "/android-x86", "destination": "https://github.com/TrueVeX/synapse-browser/releases/latest/download/SYNAPSE-Browser-Android-x86_64.apk", "permanent": false },
+    { "source": "/source", "destination": "https://github.com/TrueVeX/synapse-browser", "permanent": false }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

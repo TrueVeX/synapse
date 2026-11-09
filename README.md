@@ -9,6 +9,7 @@ SYNAPSE is an AI research assistant. Ask a question and it searches the web, rea
 - **Use SYNAPSE:** https://synapse-humanform.vercel.app
 - **Home page and downloads:** https://humanform-synapse.vercel.app
 - **Documentation:** https://synapse-humanform-docs.vercel.app
+- **SYNAPSE Browser downloads:** https://synapse-browser.vercel.app
 - **Backend API:** https://synapse-ai-research.vercel.app
 - **Downloads:** [Windows installer](https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE-Setup.exe) · [Windows portable](https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE-Portable.exe) · [Android APK](https://github.com/TrueVeX/synapse/releases/latest/download/SYNAPSE.apk)
 
