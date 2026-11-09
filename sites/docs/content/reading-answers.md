@@ -9,7 +9,7 @@ SYNAPSE answers are designed to be checked. This page explains each part of an a
 
 From top to bottom, an answer can contain:
 
-1. **Searched the web**: a collapsible block showing the search SYNAPSE ran and the sources it found.
+1. **Researched in N steps**: what SYNAPSE did on its own before answering: its plan, every search it ran and every page it opened to read in full. Select the line to expand it.
 2. **Thinking**: the model's reasoning, when the model shares it. It's collapsed once the answer starts and shows how long the model thought.
 3. **The answer**: formatted text with numbered citations.
 4. **Actions**: copy and retry buttons.
@@ -29,7 +29,17 @@ SYNAPSE is instructed never to invent a source. If the search finds nothing rele
 
 ## The sources list
 
-Expand **Searched the web** to see every page SYNAPSE read: the page title, its website, and a link. It also shows the exact search text, which helps you understand why certain pages appeared.
+Open the **Sources** tab to see every page SYNAPSE found: the page title, its website, and a link. Expand **Researched in N steps** to see the exact searches it chose and which pages it read in full, which helps you understand why certain pages appeared.
+
+## How SYNAPSE researches on its own
+
+SYNAPSE doesn't run one fixed search. Before answering, it repeats a short loop:
+
+1. **Plan**: decide what is still missing to answer well.
+2. **Act**: search the web with queries it writes itself, or open up to two of the pages it found to read them in full.
+3. **Check**: look at what it has. If sources disagree or something is missing, it goes round again; otherwise it writes the answer.
+
+Web research and Academic take up to 3 rounds; Deep research takes up to 5 and always checks the web at least once. It stops early as soon as the sources cover your question, and it never spends extra credits: one answer costs the same however many steps it takes.
 
 If web search is unavailable or fails, the block says so, and SYNAPSE answers from the model's own knowledge and any files you attached, without web citations.
 

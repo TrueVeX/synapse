@@ -458,6 +458,9 @@ export default function ChatApp() {
           case "status":
             if (event.stage === "searching") update((m) => ({ ...m, search: { state: "searching", query: event.query } }));
             break;
+          case "step":
+            update((m) => ({ ...m, steps: [...(m.steps ?? []), { kind: event.kind, text: event.text, url: event.url }] }));
+            break;
           case "sources":
             update((m) => ({
               ...m,

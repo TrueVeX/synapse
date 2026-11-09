@@ -15,6 +15,9 @@ import {
   Plus,
   ImageIcon,
   Lightbulb,
+  BookOpen,
+  Search,
+  Route,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
@@ -31,6 +34,9 @@ export type SearchState = {
   error?: string | null;
 };
 
+/** One step of the autonomous research agent (plan, search or read a page). */
+export type AgentStep = { kind: "plan" | "search" | "read"; text: string; url?: string };
+
 export type UIMessage = {
   key: string;
   id?: number | null;
@@ -39,6 +45,8 @@ export type UIMessage = {
   attachments?: string[];
   sources?: Source[];
   search?: SearchState;
+  /** What the agent did before answering, shown live. */
+  steps?: AgentStep[];
   thinking?: string;
   thinkingStartedAt?: number;
   thinkingSeconds?: number;
@@ -217,6 +225,85 @@ function SearchingPill({ query }: { query?: string }) {
   );
 }
 
+const STEP_ICON = { plan: Route, search: Search, read: BookOpen } as const;
+const STEP_LABEL = { plan: "", search: "Searched", read: "Read" } as const;
+
+/** The agent's steps: open while it works, then folds into "Researched in N steps". */
+function AgentSteps({ steps, working }: { steps: AgentStep[]; working: boolean }) {
+  const [open, setOpen] = useState(false);
+  const expanded = working || open;
+  const searches = steps.filter((step) => step.kind === "search").length;
+  const reads = steps.filter((step) => step.kind === "read").length;
+  const summary = [
+    searches && `${searches} search${searches === 1 ? "" : "es"}`,
+    reads && `${reads} page${reads === 1 ? "" : "s"} read`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        disabled={working}
+        className="inline-flex items-center gap-2 rounded-xl px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground"
+        aria-expanded={expanded}
+      >
+        <Route className={cn("size-4", working && "text-primary")} />
+        {working ? (
+          <ShiningText text="Researching on its own..." />
+        ) : (
+          <span>
+            Researched in {steps.length} step{steps.length === 1 ? "" : "s"}
+            {summary && <span className="opacity-70"> · {summary}</span>}
+          </span>
+        )}
+        {!working && <ChevronDown className={cn("size-4 transition-transform duration-200", open && "rotate-180")} />}
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.ol
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: EASE }}
+            className="mt-1 space-y-1.5 overflow-hidden border-l-2 border-border pl-4"
+          >
+            {steps.map((step, index) => {
+              const Icon = STEP_ICON[step.kind];
+              const last = working && index === steps.length - 1;
+              return (
+                <motion.li
+                  key={index}
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2, ease: EASE }}
+                  className="flex items-start gap-2 text-sm text-muted-foreground"
+                >
+                  <Icon className={cn("mt-0.5 size-3.5 shrink-0", last && "animate-pulse text-primary")} />
+                  <span className="min-w-0 break-words">
+                    {STEP_LABEL[step.kind] && <span className="font-medium text-foreground/80">{STEP_LABEL[step.kind]} </span>}
+                    {step.kind === "read" && step.url ? (
+                      <a href={step.url} target="_blank" rel="noreferrer" className="underline decoration-border underline-offset-2 hover:text-foreground">
+                        {step.text}
+                      </a>
+                    ) : step.kind === "search" ? (
+                      <span>&ldquo;{step.text}&rdquo;</span>
+                    ) : (
+                      <span>{step.text}</span>
+                    )}
+                  </span>
+                </motion.li>
+              );
+            })}
+          </motion.ol>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function ThinkingBlock({ message, active }: { message: UIMessage; active: boolean }) {
   const [open, setOpen] = useState(false);
   const seconds = message.thinkingSeconds;
@@ -272,8 +359,10 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry, showThink
   const generating = message.status === "pending" || message.status === "streaming";
   const revealing = generating || shown.length < message.content.length;
   const searching = message.search?.state === "searching";
+  const steps = message.steps ?? [];
+  const agentWorking = generating && !message.content && !message.thinking && steps.length > 0;
   const thinkingShown = showThinking && Boolean(message.thinking);
-  const waitingForWords = generating && !message.content && !searching && !thinkingShown;
+  const waitingForWords = generating && !message.content && !searching && !thinkingShown && !agentWorking;
   const thinkingActive = generating && !message.content && Boolean(message.thinking);
   const sources = message.sources ?? [];
   const hasSources = sources.length > 0 && message.search?.state !== "searching";
@@ -286,7 +375,8 @@ export function AssistantMessage({ message, isLast, canRetry, onRetry, showThink
       transition={{ duration: 0.3, ease: EASE }}
       className="group/assistant"
     >
-      {message.search?.state === "searching" && <SearchingPill query={message.search.query} />}
+      {steps.length > 0 && <AgentSteps steps={steps} working={agentWorking} />}
+      {message.search?.state === "searching" && steps.length === 0 && <SearchingPill query={message.search.query} />}
 
       {hasSources && (
         <div role="tablist" aria-label="Answer views" className="glass-pill mb-3 inline-flex items-center gap-1 p-1">

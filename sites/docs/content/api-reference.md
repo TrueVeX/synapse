@@ -233,6 +233,7 @@ The response is `application/x-ndjson`: one JSON event per line.
 | Event | Fields | Meaning |
 |---|---|---|
 | `meta` | `conversation_id`, `title`, `request_id`, `credits` | Sent first; the chat id (new or existing) and your credits after charging |
+| `step` | `kind` (`plan`, `search` or `read`), `text`, `url` (for `read`) | One step of the autonomous research loop: the plan, a search it ran, or a page it opened |
 | `status` | `stage` (`searching` or `thinking`), `query` | Progress updates |
 | `sources` | `sources`, `error`, `enabled`, `query` | Web results used for this answer |
 | `thinking` | `text` | A piece of the model's reasoning |
@@ -245,7 +246,9 @@ Example:
 
 ```text
 {"type": "meta", "conversation_id": "6337c8b7…", "title": "Compare solar and wind…", "request_id": "c0ffee…", "credits": {"used": 1, "limit": 110, "remaining": 109, "window": "day", "resets_at": "…"}}
-{"type": "status", "stage": "searching", "query": "Compare solar and wind power for a small town."}
+{"type": "step", "kind": "plan", "text": "I need recent cost and output figures for both, so I will search for them."}
+{"type": "step", "kind": "search", "text": "solar vs wind power small town cost 2026"}
+{"type": "status", "stage": "searching", "query": "solar vs wind power small town cost 2026"}
 {"type": "sources", "sources": [{"title": "…", "url": "https://…"}], "error": null, "enabled": true, "query": "…"}
 {"type": "status", "stage": "thinking"}
 {"type": "delta", "text": "Both can power a small town"}

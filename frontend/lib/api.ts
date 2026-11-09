@@ -22,6 +22,7 @@ export type StreamEvent =
   | { type: "meta"; conversation_id: string; title: string; request_id: string; credits?: CreditInfo }
   | { type: "status"; stage: "searching" | "thinking"; query?: string }
   | { type: "sources"; sources: Source[]; error: string | null; enabled: boolean; query?: string }
+  | { type: "step"; kind: "plan" | "search" | "read"; text: string; url?: string }
   | { type: "thinking"; text: string }
   | { type: "delta"; text: string }
   | { type: "done"; message_id: number | null; conversation_id: string }

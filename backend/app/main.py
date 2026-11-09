@@ -971,6 +971,252 @@ def search_web(query: str, mode: str):
 
 
 # ============================================================
+# 12b. AUTONOMOUS RESEARCH AGENT
+# Before answering, SYNAPSE plans its own next step in a loop: search the
+# web with queries it writes itself, open and read pages it found, search
+# again to fill gaps, and decide by itself when it has enough to answer.
+# ============================================================
+
+AGENT_ROUNDS = {"deep": 5, "deep research": 5}  # other modes: AGENT_DEFAULT_ROUNDS
+AGENT_DEFAULT_ROUNDS = 3
+AGENT_MAX_SOURCES = 12
+AGENT_MAX_READS = 4
+AGENT_TIME_BUDGET = 150  # seconds of planning/searching before writing the answer
+AGENT_READ_CHARS = 6000
+
+
+def read_pages(urls: list):
+    """Full text of web pages (Tavily extract). Returns {url: text}."""
+
+    if not TAVILY_API_KEY or not urls:
+        return {}
+    try:
+        response = requests.post(
+            "https://api.tavily.com/extract",
+            json={"api_key": TAVILY_API_KEY, "urls": urls[:2]},
+            timeout=40,
+        )
+        response.raise_for_status()
+        return {
+            item.get("url", ""): (item.get("raw_content") or "")[:AGENT_READ_CHARS]
+            for item in response.json().get("results", [])
+            if item.get("raw_content")
+        }
+    except Exception:
+        traceback.print_exc()
+        return {}
+
+
+def _domain(url: str) -> str:
+    match = _re.match(r"https?://(?:www\.)?([^/]+)", url or "")
+    return match.group(1) if match else url
+
+
+def plan_next_step(question, history, file_names, queries_done, sources, read_urls, rounds_left, mode):
+    """Asks the model what to do next. Returns a dict with "action"
+    ("answer" | "search" | "read"), "thought", "queries" and "sources",
+    or None when the model can't be reached or replies with something unusable."""
+
+    if not OPENROUTER_API_KEY:
+        return None
+
+    recent = "\n".join(
+        f"{m['role']}: {str(m['content'])[:300]}" for m in history[-4:]
+    ) or "(none)"
+    found = "\n".join(
+        f"[{i}] {s['title']} ({_domain(s['url'])}){' [read]' if s['url'] in read_urls else ''}: "
+        f"{(s.get('content') or '')[:220]}"
+        for i, s in enumerate(sources, start=1)
+    ) or "(none yet)"
+    deep = mode.lower() in ("deep", "deep research")
+
+    prompt = (
+        "You are the planning step of SYNAPSE, an autonomous research agent. "
+        "Decide the single best next action before the final answer is written.\n"
+        f"Today's date: {datetime.now(timezone.utc).strftime('%d %B %Y')}.\n\n"
+        "Actions:\n"
+        '- "answer": enough information is available, or the question needs no web at all '
+        "(greetings, maths, coding, writing, translation, timeless general knowledge, or questions "
+        "about the user's uploaded files).\n"
+        '- "search": run 1 or 2 focused web searches (different angles, never a repeat) when the '
+        "answer depends on current, factual, niche, local or verifiable information, or when the "
+        "sources so far miss something important.\n"
+        '- "read": open 1 or 2 of the sources found so far (by number) to read the full page, when '
+        "their snippets are too thin for an accurate answer.\n\n"
+        "Stop as soon as the sources cover the question; don't search for the sake of it."
+        + (" This is Deep research: be thorough and cover several angles." if deep else "")
+        + f"\nRounds left: {rounds_left}.\n\n"
+        f"Recent conversation:\n{recent}\n\n"
+        f"Question: {question[:1500]}\n"
+        f"Attached files: {', '.join(file_names) if file_names else 'none'}\n"
+        f"Searches already run: {'; '.join(queries_done) if queries_done else 'none'}\n"
+        f"Sources found:\n{found}\n\n"
+        "Reply with ONLY a JSON object, no other text:\n"
+        '{"thought": "<one short sentence telling the user what you will do next and why, '
+        'in the language of the question>", "action": "answer" | "search" | "read", '
+        '"queries": ["<search query>"], "sources": [<source numbers to read>]}'
+    )
+
+    try:
+        # One retry for brief network or rate-limit hiccups.
+        for attempt in range(2):
+            try:
+                response = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "X-Title": "SYNAPSE",
+                    },
+                    json={
+                        "model": OPENROUTER_MODEL,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 1500,
+                        "temperature": 0.2,
+                        "reasoning": {"effort": "low", "exclude": True},
+                    },
+                    timeout=45,
+                )
+                if response.status_code in (429, 502, 503) and attempt == 0:
+                    time.sleep(1.5)
+                    continue
+                break
+            except (requests.ConnectionError, requests.Timeout):
+                if attempt == 1:
+                    raise
+                time.sleep(1.5)
+        response.raise_for_status()
+        text = response.json()["choices"][0]["message"].get("content") or ""
+        candidates = _re.findall(r"\{[\s\S]*\}", text)
+        if not candidates:
+            return None
+        plan = json.loads(candidates[-1])
+    except Exception:
+        traceback.print_exc()
+        return None
+
+    if not isinstance(plan, dict):
+        return None
+    action = str(plan.get("action", "")).strip().lower()
+    if action not in ("answer", "search", "read"):
+        return None
+    done = {d.lower() for d in queries_done}
+    queries = [
+        " ".join(str(q).split())[:200]
+        for q in (plan.get("queries") or [])
+        if isinstance(q, str) and q.strip()
+    ]
+    queries = [q for q in queries if q.lower() not in done][:2]
+    picks = []
+    for value in plan.get("sources") or []:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= number <= len(sources) and sources[number - 1]["url"] not in read_urls and number not in picks:
+            picks.append(number)
+    return {
+        "action": action,
+        "thought": " ".join(str(plan.get("thought") or "").split())[:240],
+        "queries": queries,
+        "sources": picks[:2],
+    }
+
+
+def run_agent(question, search_text, history, file_names, mode, emit, should_stop):
+    """Runs the plan -> act loop. Returns (sources, searched): sources keep
+    their full text for the answer prompt; searched says whether the web was used.
+
+    Emits {"type": "step", "kind": "plan" | "search" | "read", "text": ...} for
+    each step, plus the usual status/sources events so the chat stays in sync."""
+
+    sources, queries_done, read_urls = [], [], set()
+
+    def add_results(results):
+        known = {s["url"] for s in sources}
+        for item in results:
+            if item.get("url") and item["url"] not in known and len(sources) < AGENT_MAX_SOURCES:
+                sources.append(dict(item))
+                known.add(item["url"])
+
+    def do_search(queries):
+        for query in queries:
+            if should_stop():
+                return
+            queries_done.append(query)
+            emit({"type": "step", "kind": "search", "text": query})
+            emit({"type": "status", "stage": "searching", "query": query})
+            error = None
+            try:
+                add_results(search_web(query, mode))
+            except HTTPException as exc:
+                error = str(exc.detail)
+            emit({
+                "type": "sources",
+                "sources": public_sources(sources),
+                "error": error if not sources else None,
+                "enabled": True,
+                "query": query,
+            })
+
+    # Fast paths: no web search available, or plain small talk.
+    if not TAVILY_API_KEY or _SMALL_TALK.match(question or ""):
+        return sources, False
+
+    deep = mode.lower() in ("deep", "deep research")
+    rounds = AGENT_ROUNDS.get(mode.lower(), AGENT_DEFAULT_ROUNDS)
+    started = time.monotonic()
+
+    for round_index in range(rounds):
+        if should_stop() or time.monotonic() - started > AGENT_TIME_BUDGET:
+            break
+
+        plan = plan_next_step(
+            question, history, file_names, queries_done, sources, read_urls,
+            rounds - round_index, mode,
+        )
+
+        if plan is None:
+            # The planner couldn't be reached: fall back to the simple rule once.
+            if not queries_done and needs_web_search(question, search_text, mode):
+                do_search([search_text])
+            break
+
+        # Show the plan, except when the agent simply answers straight away
+        # (a greeting, a poem...): then there is no research to show.
+        if plan["thought"] and (plan["action"] != "answer" or queries_done or deep):
+            emit({"type": "step", "kind": "plan", "text": plan["thought"]})
+
+        if plan["action"] == "answer":
+            # Deep research always looks at the web at least once.
+            if deep and not queries_done:
+                do_search(plan["queries"] or [search_text])
+                continue
+            break
+
+        if plan["action"] == "search":
+            queries = plan["queries"] or ([] if queries_done else [search_text])
+            if not queries:
+                break  # nothing new to look up
+            do_search(queries)
+            continue
+
+        if plan["action"] == "read":
+            if len(read_urls) >= AGENT_MAX_READS or not plan["sources"]:
+                break
+            picked = [sources[n - 1] for n in plan["sources"]]
+            for source in picked:
+                emit({"type": "step", "kind": "read", "text": source["title"], "url": source["url"]})
+            pages = read_pages([s["url"] for s in picked])
+            for source in picked:
+                read_urls.add(source["url"])
+                if pages.get(source["url"]):
+                    source["content"] = pages[source["url"]]
+
+    return sources, bool(queries_done)
+
+
+# ============================================================
 # 13. OPENROUTER AI RESEARCH
 # ============================================================
 
@@ -1063,7 +1309,9 @@ def build_research_prompt(
         f"{instruction}\n"
         "Never invent facts, URLs, or citations. "
         "Use source markers such as [1] when supported "
-        "by the supplied web results. Explain uncertainty.\n"
+        "by the web results below. Explain uncertainty. Don't describe how "
+        "the sources were collected (no 'supplied results', 'evidence base' "
+        "or methodology notes) and don't address the user by name in headings.\n"
         f"{source_context}"
         f"{document_context}"
     )
@@ -1548,7 +1796,26 @@ def save_assistant_message(
 
 
 def stream_openrouter(messages: list):
-    """Yields ("thinking" | "delta", text) pieces as OpenRouter streams them."""
+    """Yields ("thinking" | "delta", text) pieces as OpenRouter streams them.
+
+    If the connection fails before anything arrived (a brief network or TLS
+    hiccup), it tries once more instead of failing the whole answer."""
+
+    for attempt in range(2):
+        produced = False
+        try:
+            for piece in _stream_openrouter_once(messages):
+                produced = True
+                yield piece
+            return
+        except ChatError as exc:
+            if produced or attempt == 1 or not isinstance(exc.__cause__, requests.ConnectionError):
+                raise
+            time.sleep(1.5)
+
+
+def _stream_openrouter_once(messages: list):
+    """One streaming request to OpenRouter (see stream_openrouter)."""
 
     if not OPENROUTER_API_KEY:
         raise ChatError(
@@ -1939,34 +2206,17 @@ async def chat_stream(
                 }
             )
 
-            searched = needs_web_search(user_query, search_query, mode)
-
-            if searched:
-                emit(
-                    {
-                        "type": "status",
-                        "stage": "searching",
-                        "query": search_query,
-                    }
-                )
-
-                search_error = None
-
-                try:
-                    sources = public_sources(search_web(search_query, mode))
-                except HTTPException as exc:
-                    search_error = str(exc.detail)
-                    sources = []
-
-                emit(
-                    {
-                        "type": "sources",
-                        "sources": sources,
-                        "error": search_error,
-                        "enabled": bool(TAVILY_API_KEY),
-                        "query": search_query,
-                    }
-                )
+            # Autonomous research: the agent plans, searches and reads by itself.
+            agent_sources, searched = run_agent(
+                user_query,
+                search_query,
+                history,
+                attached_filenames,
+                mode,
+                emit,
+                generation.should_stop,
+            )
+            sources = public_sources(agent_sources)
 
             if generation.should_stop():
                 emit({"type": "stopped"})
@@ -1977,7 +2227,7 @@ async def chat_stream(
             prompt_text = build_research_prompt(
                 user_query,
                 mode,
-                sources,
+                agent_sources,
                 document_text,
                 searched=searched,
             )

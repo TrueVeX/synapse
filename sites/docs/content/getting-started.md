@@ -32,8 +32,8 @@ Not sure what to ask? Select one of the suggestion chips under the box (**Resear
 
 Each answer happens in stages you can follow:
 
-1. **Searched the web**: SYNAPSE writes a search based on your question and the chat so far.
-2. **Sources**: the pages it found appear in a compact list you can expand.
+1. **Researching on its own**: SYNAPSE works like an agent. It plans its next step, writes its own searches, opens and reads the most useful pages in full, and searches again if something is missing or the sources disagree. Each step appears live; when it's done the list folds into a line such as *Researched in 6 steps · 2 searches · 2 pages read*. For questions that don't need the web (a greeting, a poem, maths, code) it skips this and answers straight away.
+2. **Sources**: the pages it found appear as cards, with a **Sources** tab listing them all.
 3. **Thinking**: a shimmering "thinking" label appears while the model works. Some models also share their reasoning, which you can open in a **thinking panel**.
 4. **The answer** streams in word by word, with numbered citation chips.
 
