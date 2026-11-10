@@ -39,7 +39,7 @@ SYNAPSE doesn't run one fixed search. Before answering, it repeats a short loop:
 2. **Act**: search the web with queries it writes itself, or open up to two of the pages it found to read them in full.
 3. **Check**: look at what it has. If sources disagree or something is missing, it goes round again; otherwise it writes the answer.
 
-Web research and Academic take up to 3 rounds; Deep research takes up to 5 and always checks the web at least once. It stops early as soon as the sources cover your question, and it never spends extra credits: one answer costs the same however many steps it takes.
+**Web research** is built for speed: it plans once, runs its searches at the same time, and answers straight away (it only goes round again if the first results are thin), so most answers start within seconds. **Academic** takes up to 3 rounds, and **Deep research** up to 4: it reads full pages, always checks the web at least once, and thinks longer before writing. It stops early as soon as the sources cover your question, and it never spends extra credits: one answer costs the same however many steps it takes.
 
 If web search is unavailable or fails, the block says so, and SYNAPSE answers from the model's own knowledge and any files you attached, without web citations.
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import base64
 import hashlib
 import hmac
@@ -977,12 +978,25 @@ def search_web(query: str, mode: str):
 # again to fill gaps, and decide by itself when it has enough to answer.
 # ============================================================
 
-AGENT_ROUNDS = {"deep": 5, "deep research": 5}  # other modes: AGENT_DEFAULT_ROUNDS
-AGENT_DEFAULT_ROUNDS = 3
+# Planning rounds per mode. Web research is built for speed: one plan, its
+# searches run in parallel, and a second round only if the results are thin.
+AGENT_ROUNDS = {"web": 2, "academic": 3, "deep": 4, "deep research": 4}
+AGENT_DEFAULT_ROUNDS = 2
+AGENT_THIN_RESULTS = 4  # Web research: fewer sources than this earns a second round
 AGENT_MAX_SOURCES = 12
 AGENT_MAX_READS = 4
-AGENT_TIME_BUDGET = 150  # seconds of planning/searching before writing the answer
+# Seconds of planning/searching before the answer is written, per mode.
+AGENT_TIME_BUDGET = {"web": 35, "academic": 60, "deep": 120, "deep research": 120}
 AGENT_READ_CHARS = 6000
+# Longest wait for one planning reply; slower than this, the agent falls
+# back to searching the question directly instead of waiting.
+AGENT_PLAN_TIMEOUT = {"web": 12, "academic": 20, "deep": 30, "deep research": 30}
+
+# How hard the model thinks before writing the final answer, per mode
+# (lighter thinking = the answer starts much sooner).
+ANSWER_EFFORT = {"web": "off", "academic": "low", "deep": "medium", "deep research": "medium"}
+# Web research keeps only its best sources so the answer starts sooner.
+ANSWER_MAX_SOURCES = {"web": 8}
 
 
 def read_pages(urls: list):
@@ -1012,7 +1026,7 @@ def _domain(url: str) -> str:
     return match.group(1) if match else url
 
 
-def plan_next_step(question, history, file_names, queries_done, sources, read_urls, rounds_left, mode):
+def plan_next_step(question, history, file_names, queries_done, sources, read_urls, rounds_left, mode, timeout=30):
     """Asks the model what to do next. Returns a dict with "action"
     ("answer" | "search" | "read"), "thought", "queries" and "sources",
     or None when the model can't be reached or replies with something unusable."""
@@ -1043,6 +1057,10 @@ def plan_next_step(question, history, file_names, queries_done, sources, read_ur
         "sources so far miss something important.\n"
         '- "read": open 1 or 2 of the sources found so far (by number) to read the full page, when '
         "their snippets are too thin for an accurate answer.\n\n"
+        "Your own knowledge is out of date. Never assume which product, version, model, season "
+        "or office-holder is the newest or current: write queries that ask for the latest/newest "
+        f"one and include the current year ({datetime.now(timezone.utc).year}), e.g. "
+        f"\"newest iPhone battery life {datetime.now(timezone.utc).year}\", not an old model name.\n"
         "Stop as soon as the sources cover the question; don't search for the sake of it."
         + (" This is Deep research: be thorough and cover several angles." if deep else "")
         + f"\nRounds left: {rounds_left}.\n\n"
@@ -1071,17 +1089,18 @@ def plan_next_step(question, history, file_names, queries_done, sources, read_ur
                     json={
                         "model": OPENROUTER_MODEL,
                         "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 1500,
+                        "max_tokens": 600,
                         "temperature": 0.2,
-                        "reasoning": {"effort": "low", "exclude": True},
+                        "reasoning": {"enabled": False},
                     },
-                    timeout=45,
+                    timeout=timeout,
                 )
                 if response.status_code in (429, 502, 503) and attempt == 0:
                     time.sleep(1.5)
                     continue
                 break
-            except (requests.ConnectionError, requests.Timeout):
+            except requests.ConnectionError:
+                # (a slow reply is not retried: the caller falls back instead)
                 if attempt == 1:
                     raise
                 time.sleep(1.5)
@@ -1140,40 +1159,56 @@ def run_agent(question, search_text, history, file_names, mode, emit, should_sto
                 known.add(item["url"])
 
     def do_search(queries):
+        """Runs the searches at the same time, then adds results in order."""
+        queries = [q for q in queries if q][:2]
+        if not queries or should_stop():
+            return
         for query in queries:
-            if should_stop():
-                return
             queries_done.append(query)
             emit({"type": "step", "kind": "search", "text": query})
-            emit({"type": "status", "stage": "searching", "query": query})
-            error = None
+        emit({"type": "status", "stage": "searching", "query": queries[0]})
+
+        def one(query):
             try:
-                add_results(search_web(query, mode))
+                return search_web(query, mode), None
             except HTTPException as exc:
-                error = str(exc.detail)
-            emit({
-                "type": "sources",
-                "sources": public_sources(sources),
-                "error": error if not sources else None,
-                "enabled": True,
-                "query": query,
-            })
+                return [], str(exc.detail)
+
+        with ThreadPoolExecutor(max_workers=len(queries)) as pool:
+            outcomes = list(pool.map(one, queries))
+        errors = [error for _, error in outcomes if error]
+        # Interleave so both searches contribute their best results first.
+        for rank in range(max(len(results) for results, _ in outcomes)):
+            add_results([results[rank] for results, _ in outcomes if rank < len(results)])
+        emit({
+            "type": "sources",
+            "sources": public_sources(sources),
+            "error": errors[0] if errors and not sources else None,
+            "enabled": True,
+            "query": queries[-1],
+        })
 
     # Fast paths: no web search available, or plain small talk.
     if not TAVILY_API_KEY or _SMALL_TALK.match(question or ""):
         return sources, False
 
     deep = mode.lower() in ("deep", "deep research")
+    web = mode.lower() not in ("academic", "deep", "deep research")
     rounds = AGENT_ROUNDS.get(mode.lower(), AGENT_DEFAULT_ROUNDS)
+    budget = AGENT_TIME_BUDGET.get(mode.lower(), 35)
     started = time.monotonic()
 
     for round_index in range(rounds):
-        if should_stop() or time.monotonic() - started > AGENT_TIME_BUDGET:
+        if should_stop() or time.monotonic() - started > budget:
+            break
+        # Web research answers right after a good first search.
+        if web and round_index > 0 and len(sources) >= AGENT_THIN_RESULTS:
             break
 
         plan = plan_next_step(
             question, history, file_names, queries_done, sources, read_urls,
             rounds - round_index, mode,
+            timeout=AGENT_PLAN_TIMEOUT.get(mode.lower(), 12),
         )
 
         if plan is None:
@@ -1207,7 +1242,7 @@ def run_agent(question, search_text, history, file_names, mode, emit, should_sto
             picked = [sources[n - 1] for n in plan["sources"]]
             for source in picked:
                 emit({"type": "step", "kind": "read", "text": source["title"], "url": source["url"]})
-            pages = read_pages([s["url"] for s in picked])
+            pages = read_pages([s["url"] for s in picked])  # one request reads both
             for source in picked:
                 read_urls.add(source["url"])
                 if pages.get(source["url"]):
@@ -1308,6 +1343,9 @@ def build_research_prompt(
         f"Question: {query}\n\n"
         f"{instruction}\n"
         "Never invent facts, URLs, or citations. "
+        f"Today's date is {datetime.now(timezone.utc).strftime('%d %B %Y')}. When sources "
+        "disagree about what is latest or current, trust the most recent, most official "
+        "source and say so briefly. "
         "Use source markers such as [1] when supported "
         "by the web results below. Explain uncertainty. Don't describe how "
         "the sources were collected (no 'supplied results', 'evidence base' "
@@ -1795,7 +1833,7 @@ def save_assistant_message(
         return cursor.lastrowid
 
 
-def stream_openrouter(messages: list):
+def stream_openrouter(messages: list, effort: Optional[str] = None):
     """Yields ("thinking" | "delta", text) pieces as OpenRouter streams them.
 
     If the connection fails before anything arrived (a brief network or TLS
@@ -1804,7 +1842,7 @@ def stream_openrouter(messages: list):
     for attempt in range(2):
         produced = False
         try:
-            for piece in _stream_openrouter_once(messages):
+            for piece in _stream_openrouter_once(messages, effort):
                 produced = True
                 yield piece
             return
@@ -1814,7 +1852,7 @@ def stream_openrouter(messages: list):
             time.sleep(1.5)
 
 
-def _stream_openrouter_once(messages: list):
+def _stream_openrouter_once(messages: list, effort: Optional[str] = None):
     """One streaming request to OpenRouter (see stream_openrouter)."""
 
     if not OPENROUTER_API_KEY:
@@ -1836,6 +1874,11 @@ def _stream_openrouter_once(messages: list):
                 "messages": messages,
                 "temperature": 0.3,
                 "stream": True,
+                **(
+                    {"reasoning": {"enabled": False}} if effort == "off"
+                    else {"reasoning": {"effort": effort}} if effort
+                    else {}
+                ),
             },
             stream=True,
             timeout=(15, 120),
@@ -2216,7 +2259,13 @@ async def chat_stream(
                 emit,
                 generation.should_stop,
             )
+            keep = ANSWER_MAX_SOURCES.get(mode.lower(), len(agent_sources))
+            trimmed = len(agent_sources) > keep
+            agent_sources = agent_sources[:keep]
             sources = public_sources(agent_sources)
+            if trimmed:
+                # Keep the source cards in step with the citation numbers.
+                emit({"type": "sources", "sources": sources, "error": None, "enabled": True})
 
             if generation.should_stop():
                 emit({"type": "stopped"})
@@ -2241,7 +2290,7 @@ async def chat_stream(
                 },
             ]
 
-            pieces = stream_openrouter(messages)
+            pieces = stream_openrouter(messages, ANSWER_EFFORT.get(mode.lower(), "low"))
 
             try:
                 for kind, text in pieces:
