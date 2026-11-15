@@ -470,7 +470,16 @@ function CodeFlow({ purpose, onBack }: { purpose: "login" | "reset"; onBack: () 
 
 function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle: () => void }) {
   const [view, setView] = useState<"form" | "login" | "reset">("form");
+  // Code options appear only when the server can send email or text codes.
+  const [codesReady, setCodesReady] = useState(false);
   const [showGoogle, setShowGoogle] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/auth/otp/channels`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setCodesReady(Boolean(data && (data.email || data.sms))))
+      .catch(() => setCodesReady(false));
+  }, []);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState("");
 
@@ -503,8 +512,8 @@ function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle
         <AuthForm
           key={isSignIn ? "signin" : "signup"}
           mode={isSignIn ? "signin" : "signup"}
-          onForgot={() => setView("reset")}
-          onCode={() => setView("login")}
+          onForgot={codesReady ? () => setView("reset") : undefined}
+          onCode={codesReady ? () => setView("login") : undefined}
         />
       )}
       {view === "form" && (
