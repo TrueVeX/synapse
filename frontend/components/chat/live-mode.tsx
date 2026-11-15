@@ -181,7 +181,7 @@ export function LiveMode({ onClose }: { onClose: (conversationId: string | null)
       voiceRef.current = voiceRef.current ?? pickVoice(langRef.current);
       if (voiceRef.current) utterance.voice = voiceRef.current;
       utterance.lang = voiceRef.current?.lang ?? langRef.current;
-      utterance.rate = 1.04;
+      utterance.rate = 1.1;
       utterance.pitch = 1;
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve();

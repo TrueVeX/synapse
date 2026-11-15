@@ -1833,7 +1833,7 @@ def save_assistant_message(
         return cursor.lastrowid
 
 
-def stream_openrouter(messages: list, effort: Optional[str] = None):
+def stream_openrouter(messages: list, effort: Optional[str] = None, max_tokens: Optional[int] = None):
     """Yields ("thinking" | "delta", text) pieces as OpenRouter streams them.
 
     If the connection fails before anything arrived (a brief network or TLS
@@ -1842,7 +1842,7 @@ def stream_openrouter(messages: list, effort: Optional[str] = None):
     for attempt in range(2):
         produced = False
         try:
-            for piece in _stream_openrouter_once(messages, effort):
+            for piece in _stream_openrouter_once(messages, effort, max_tokens):
                 produced = True
                 yield piece
             return
@@ -1852,7 +1852,7 @@ def stream_openrouter(messages: list, effort: Optional[str] = None):
             time.sleep(1.5)
 
 
-def _stream_openrouter_once(messages: list, effort: Optional[str] = None):
+def _stream_openrouter_once(messages: list, effort: Optional[str] = None, max_tokens: Optional[int] = None):
     """One streaming request to OpenRouter (see stream_openrouter)."""
 
     if not OPENROUTER_API_KEY:
@@ -1874,6 +1874,7 @@ def _stream_openrouter_once(messages: list, effort: Optional[str] = None):
                 "messages": messages,
                 "temperature": 0.3,
                 "stream": True,
+                **({"max_tokens": max_tokens} if max_tokens else {}),
                 **(
                     {"reasoning": {"enabled": False}} if effort == "off"
                     else {"reasoning": {"effort": effort}} if effort
@@ -2458,22 +2459,38 @@ def related_questions(
 # ============================================================
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
-# Default voice: "Sarah" (soft, warm), one of ElevenLabs' default voices,
-# which work on the free plan (Voice Library voices need a paid plan for the API).
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL").strip() or "EXAVITQu4vr4xnSDxMaL"
+# Default voice: "Jessica" (young, playful, expressive, casual), one of
+# ElevenLabs' default voices, which work on the free plan (Voice Library
+# voices need a paid plan for the API).
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9").strip() or "cgSgspJ2msm6clMCkdW9"
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5").strip()
 
 LIVE_MAX_IMAGE_BYTES = 4 * 1024 * 1024
 LIVE_SYSTEM_PROMPT = (
     SYSTEM_PROMPT
-    + " You are in Live mode: a real-time spoken conversation, like a phone call. "
-    "Your reply is read aloud, so talk like a friendly, natural person: usually one to "
-    "three short sentences, longer only when the user asks for detail. Never use "
-    "Markdown, lists, headings, tables, emojis, URLs or citation markers like [1]. "
+    + " You are in Live mode: a real-time spoken conversation, read aloud. "
+    "Personality: a sharp, quick-witted friend. Casual, confident, a little playful and "
+    "dry, never stiff or corporate. You can crack a short joke when it fits, but the "
+    "answer always comes first.\n"
+    "How to answer:\n"
+    "- Lead with the answer itself in the first sentence. No warm-up.\n"
+    "- Usually one or two short sentences. Go longer only if the user asks for detail "
+    "or steps.\n"
+    "- Never restate the question, never say things like 'Great question', 'Sure!', "
+    "'Certainly', 'As an AI', and never end with offers like 'Let me know if...' or "
+    "'Anything else?'.\n"
+    "- No hedging or disclaimers unless something is genuinely risky or uncertain; "
+    "then say it in a few words.\n"
+    "- If you don't know, say so plainly and briefly.\n"
+    "- Spoken style only: no Markdown, lists, headings, tables, emojis, URLs or "
+    "citation markers like [1]. Say numbers the way people say them.\n"
     "When an image is attached, it is what the user is showing you right now through "
-    "their camera or shared screen: use it naturally (\"I can see...\") and say so if "
-    "it's unclear. Reply in the language the user speaks."
+    "their camera or shared screen: answer about it directly (\"That's a...\"), and say "
+    "so if it's unclear. Reply in the language the user speaks."
 )
+
+# Live replies are short by design; this also keeps the voice snappy.
+LIVE_MAX_TOKENS = 260
 
 
 @app.get("/api/live/config")
@@ -2483,6 +2500,7 @@ def live_config(authorization: Optional[str] = Header(default=None)):
     require_user(authorization)
     return {
         "voice": "elevenlabs" if ELEVENLABS_API_KEY else "browser",
+        "voice_id": ELEVENLABS_VOICE_ID if ELEVENLABS_API_KEY else None,
         "search": bool(TAVILY_API_KEY),
     }
 
@@ -2591,7 +2609,7 @@ async def live_turn(
                 *history,
                 {"role": "user", "content": build_user_content(prompt, image_inputs)},
             ]
-            for kind, piece in stream_openrouter(messages, "off"):
+            for kind, piece in stream_openrouter(messages, "off", LIVE_MAX_TOKENS):
                 if kind == "delta":
                     parts.append(piece)
                     yield json.dumps({"type": "delta", "text": piece}) + "\n"
@@ -2638,7 +2656,8 @@ def live_speak(payload: SpeakRequest, authorization: Optional[str] = Header(defa
             json={
                 "text": payload.text,
                 "model_id": ELEVENLABS_MODEL,
-                "voice_settings": {"stability": 0.45, "similarity_boost": 0.8},
+                # Lower stability = more expressive; a touch faster than normal.
+                "voice_settings": {"stability": 0.35, "similarity_boost": 0.8, "style": 0.3, "speed": 1.08},
             },
             stream=True,
             timeout=(10, 60),
