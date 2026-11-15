@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  Check,
   ChevronRight,
   Database,
   Download,
@@ -496,6 +497,188 @@ function DataTab({ onToast, onChatsCleared }: { onToast: (text: string) => void;
   );
 }
 
+type PhoneInfo = { phone: string | null; masked: string | null; sms_enabled: boolean; default_country: string };
+
+/** Add, verify (text code) or remove the account's mobile number. */
+function PhoneRow({ onToast }: { onToast: (text: string) => void }) {
+  const [info, setInfo] = useState<PhoneInfo | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [pending, setPending] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [wait, setWait] = useState(0);
+
+  const load = useCallback(() => {
+    api<PhoneInfo>("/api/account/phone").then(setInfo).catch(() => {});
+  }, []);
+  useEffect(load, [load]);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [wait]);
+
+  const field =
+    "h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-base text-foreground outline-none focus-visible:border-ring sm:h-9 sm:w-56 sm:text-sm";
+  const primary =
+    "inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40 sm:h-9";
+
+  async function sendCode(number: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api<{ phone: string; resend_in: number }>("/api/account/phone/send", {
+        method: "POST",
+        body: JSON.stringify({ phone: number }),
+      });
+      setPending(result.phone);
+      setWait(result.resend_in);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't send the code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify() {
+    if (!pending) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/api/account/phone/verify", { method: "POST", body: JSON.stringify({ phone: pending, code }) });
+      onToast("Mobile number verified.");
+      setEditing(false);
+      setPending(null);
+      setCode("");
+      setPhone("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That code didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    try {
+      await api("/api/account/phone", { method: "DELETE" });
+      onToast("Mobile number removed.");
+      load();
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Couldn't remove the number.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const description = info?.sms_enabled
+    ? "Get sign-in and password reset codes by text message."
+    : "Text message codes aren't available yet. You can still use email codes.";
+
+  return (
+    <Row label="Mobile number" description={description} stack={editing}>
+      {!editing ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {info?.phone ? (
+            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Check className="size-4 text-foreground" /> {info.masked}
+            </span>
+          ) : null}
+          {info?.sms_enabled && (
+            <ActionButton onClick={() => setEditing(true)} busy={busy && !editing}>
+              {info?.phone ? "Change" : "Add number"}
+            </ActionButton>
+          )}
+          {info?.phone && (
+            <ActionButton onClick={remove} busy={busy} danger>
+              Remove
+            </ActionButton>
+          )}
+        </div>
+      ) : (
+        <div className="grid gap-2">
+          {!pending ? (
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (phone.trim()) void sendCode(phone);
+              }}
+            >
+              <input
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder={`${info?.default_country ?? "+91"} 98765 43210`}
+                aria-label="Mobile number"
+                className={field}
+                autoFocus
+              />
+              <button type="submit" disabled={busy || !phone.trim()} className={primary}>
+                {busy && <Loader2 className="size-4 animate-spin" />}
+                Send code
+              </button>
+            </form>
+          ) : (
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (code.length === 6) void verify();
+              }}
+            >
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6-digit code"
+                aria-label="Code from the text message"
+                className={cn(field, "font-mono tracking-[0.3em]")}
+                autoFocus
+              />
+              <button type="submit" disabled={busy || code.length !== 6} className={primary}>
+                {busy && <Loader2 className="size-4 animate-spin" />}
+                Verify
+              </button>
+            </form>
+          )}
+          {error && <p className="text-[13px] text-red-500 dark:text-red-400">{error}</p>}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+            {pending && (
+              <button
+                type="button"
+                disabled={wait > 0 || busy}
+                onClick={() => void sendCode(pending)}
+                className="hover:text-foreground disabled:opacity-60"
+              >
+                {wait > 0 ? `Resend in ${wait}s` : "Resend code"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false);
+                setPending(null);
+                setCode("");
+                setError(null);
+              }}
+              className="hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </Row>
+  );
+}
+
 function AccountTab({
   user,
   billing,
@@ -570,6 +753,7 @@ function AccountTab({
         <Row label="Email" description="Used to sign in. It can't be changed.">
           <span className="text-sm text-muted-foreground">{user.email}</span>
         </Row>
+        <PhoneRow onToast={onToast} />
         <Row
           label="Plan"
           description={

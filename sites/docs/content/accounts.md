@@ -9,6 +9,7 @@ description: Signing up with email or Google, staying signed in, using the apps,
 |---|---|---|
 | **Email and password** | Website, Windows app, Android app | The name, email and password you enter |
 | **Continue with Google** | Website | Your name and verified email address from Google |
+| **Sign in with a code** | Website, Windows app, Android app | A 6-digit code sent to your email, or by text to the mobile number on your account |
 
 ### Passwords
 
@@ -33,11 +34,25 @@ To sign out, open the account menu at the bottom of the sidebar, or go to **Sett
 The Windows and Android apps sign in with **email and password**. Google's sign-in isn't available inside apps, because Google doesn't allow its sign-in inside app windows, so the apps hide that button.
 
 > [!NOTE]
-> If you created your account with **Continue with Google**, it has no SYNAPSE password yet, so you can't sign in to the apps with it for now. Use SYNAPSE in your phone's browser instead, and add it to your home screen for an app-like experience (Chrome: **⋮ → Add to Home screen**; Safari: **Share → Add to Home Screen**).
+> If you created your account with **Continue with Google**, it has no SYNAPSE password yet. To use the apps, choose **Sign in with a code** (the code goes to your Google email), or set a password with **Forgot password?**. Use SYNAPSE in your phone's browser instead, and add it to your home screen for an app-like experience (Chrome: **⋮ → Add to Home screen**; Safari: **Share → Add to Home Screen**).
 
 ## Forgotten password
 
-Password reset by email isn't available yet. If you've forgotten your password and also signed up with a Google account using the same email, sign in with Google on the website. Otherwise, contact us through [GitHub](https://github.com/TrueVeX/synapse/issues) without posting any private details.
+1. On the sign-in screen, select **Forgot password?** (next to the password field).
+2. Enter your **email**, or the **mobile number** you added to your account, and select **Send code**.
+3. Enter the **6-digit code** from the email or text message, choose a **new password**, and select **Set new password**. You're signed in straight away.
+
+Codes expire after **10 minutes** and stop working after **5 wrong tries**. You can ask for a new code after 45 seconds (up to 5 an hour). For your privacy, SYNAPSE gives the same reply whether or not an account exists for what you typed, so if no code arrives, check the spelling, your spam folder, or try your other sign-in.
+
+This also works for accounts created with Google: it sets a SYNAPSE password so you can use the apps.
+
+## Sign in with a code
+
+Prefer not to type a password? Select **Sign in with a code** on the sign-in screen, enter your email or mobile number, and type the 6-digit code you receive.
+
+## Your mobile number
+
+Add a mobile number in **Settings → Account → Mobile number**. SYNAPSE texts a 6-digit code to confirm it's yours. Once added, you can use the number to sign in with a code or reset your password. Numbers without a country code are treated as Indian (+91); for other countries, start with **+** and the country code. Each number can belong to one account. You can change or remove it at any time.
 
 ## Changing your details
 

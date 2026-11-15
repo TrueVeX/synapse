@@ -3,6 +3,12 @@ title: Changelog
 description: What's new in SYNAPSE.
 ---
 
+## November 15, 2026: Codes by email and text
+
+- **Forgot password?**: reset your password with a 6-digit code sent by email or text message.
+- **Sign in with a code**: no password needed.
+- **Mobile number** in Settings → Account, verified by text.
+
 ## November 15, 2026: Live mode
 
 - **Live mode**: talk with SYNAPSE out loud and show it your camera or screen. It answers by voice (ElevenLabs or your device's voice), checks the web when needed, and saves the conversation as a chat. See [Live mode](/live-mode).

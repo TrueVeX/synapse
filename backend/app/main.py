@@ -269,6 +269,7 @@ def duplicate_key_errors():
 APP_TABLES = (
     "users", "conversations", "messages", "subscriptions", "payments",
     "credit_usage", "chat_stops", "user_settings", "razorpay_subscriptions",
+    "otp_codes", "user_phones",
 )
 APP_INDEXES = ("idx_conversations_user", "idx_messages_conversation")
 
@@ -433,10 +434,43 @@ def initialize_database():
             )
             """
         )
+        # One-time codes for sign-in, password reset and phone checks.
+        # Only a keyed hash of each code is stored.
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS otp_codes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel TEXT NOT NULL,
+                destination TEXT NOT NULL,
+                purpose TEXT NOT NULL,
+                code_hash TEXT NOT NULL,
+                user_id INTEGER,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_otp_destination ON otp_codes (destination, purpose)"
+        )
+        # A verified mobile number per account (sign in / reset by SMS).
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_phones (
+                user_id INTEGER PRIMARY KEY,
+                phone TEXT NOT NULL UNIQUE,
+                verified_at TEXT NOT NULL
+            )
+            """
+        )
         if USE_POSTGRES:
             # Keep these tables closed to Supabase's public Data API, like the others.
             connection.execute("ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY")
             connection.execute("ALTER TABLE razorpay_subscriptions ENABLE ROW LEVEL SECURITY")
+            connection.execute("ALTER TABLE otp_codes ENABLE ROW LEVEL SECURITY")
+            connection.execute("ALTER TABLE user_phones ENABLE ROW LEVEL SECURITY")
         connection.commit()
 
 
@@ -695,6 +729,420 @@ def login_user(payload: LoginRequest):
 # 10. CURRENT USER
 # FIXES THE /api/auth/me 404 ERROR
 # ============================================================
+
+# ============================================================
+# 9c. ONE-TIME CODES (email and SMS)
+# Forgot password, sign in with a code, and adding a phone number.
+# Email goes out over any SMTP service (Gmail app password, Brevo, Resend,
+# Zoho...). SMS goes through Twilio Verify, which handles each country's
+# rules (including India's DLT registration) itself.
+# ============================================================
+
+import re as _re
+import smtplib
+from email.message import EmailMessage
+
+SMTP_HOST = os.getenv("SMTP_HOST", "").strip()
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or 587)
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
+SMTP_FROM = os.getenv("SMTP_FROM", "").strip() or SMTP_USER
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+TWILIO_VERIFY_SID = os.getenv("TWILIO_VERIFY_SID", "").strip()
+# Numbers typed without a country code get this one (India by default).
+OTP_DEFAULT_COUNTRY = os.getenv("OTP_DEFAULT_COUNTRY", "+91").strip() or "+91"
+# Local testing only: print codes in the backend terminal instead of sending.
+OTP_DEBUG = os.getenv("OTP_DEBUG", "").strip() == "1" and not ON_VERCEL
+
+OTP_TTL_MINUTES = 10
+OTP_MAX_ATTEMPTS = 5
+OTP_RESEND_SECONDS = 45
+OTP_MAX_PER_HOUR = 5
+OTP_PURPOSES = ("login", "reset", "phone")
+
+EMAIL_ENABLED = bool(SMTP_HOST and SMTP_FROM) or OTP_DEBUG
+SMS_ENABLED = bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SID) or OTP_DEBUG
+
+_PHONE_RE = _re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+def normalize_phone(raw: str) -> Optional[str]:
+    """'+91 98765 43210', '098765 43210', '9876543210' -> '+919876543210'."""
+    digits = _re.sub(r"[\s\-().]", "", raw or "")
+    if digits.startswith("00"):
+        digits = "+" + digits[2:]
+    if not digits.startswith("+"):
+        digits = digits.lstrip("0")
+        if len(digits) == 10 and digits.isdigit():
+            digits = OTP_DEFAULT_COUNTRY + digits
+        else:
+            digits = "+" + digits
+    return digits if _PHONE_RE.match(digits) else None
+
+
+def mask_destination(channel: str, destination: str) -> str:
+    if channel == "email":
+        name, _, domain = destination.partition("@")
+        return f"{name[:2]}{'•' * max(1, len(name) - 2)}@{domain}"
+    return f"{destination[:-10] if len(destination) > 10 else ''} ••••• {destination[-4:]}".strip()
+
+
+def parse_destination(raw: str):
+    """Returns (channel, normalized destination) or raises 400."""
+    value = (raw or "").strip()
+    if "@" in value:
+        email = value.lower()
+        if not _re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email) or len(email) > 254:
+            raise HTTPException(status_code=400, detail="Please enter a valid email address.")
+        return "email", email
+    phone = normalize_phone(value)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address or mobile number.")
+    return "sms", phone
+
+
+def _code_hash(destination: str, purpose: str, code: str) -> str:
+    return hmac.new(JWT_SECRET.encode(), f"{destination}|{purpose}|{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def user_for_destination(channel: str, destination: str):
+    if channel == "email":
+        return find_user_by_email(destination)
+    with get_connection() as connection:
+        return connection.execute(
+            """
+            SELECT u.id, u.name, u.email, u.password_hash, u.created_at
+            FROM user_phones p JOIN users u ON u.id = p.user_id
+            WHERE p.phone = ?
+            """,
+            (destination,),
+        ).fetchone()
+
+
+def send_code_email(to: str, code: str, purpose: str):
+    action = {
+        "login": "sign in to SYNAPSE",
+        "reset": "reset your SYNAPSE password",
+        "phone": "confirm your SYNAPSE account",
+    }[purpose]
+    message = EmailMessage()
+    message["Subject"] = f"{code} is your SYNAPSE code"
+    message["From"] = f"SYNAPSE <{SMTP_FROM}>" if "<" not in SMTP_FROM else SMTP_FROM
+    message["To"] = to
+    message.set_content(
+        f"Your code to {action} is {code}.\n\n"
+        f"It expires in {OTP_TTL_MINUTES} minutes. If you didn't ask for it, you can ignore this email; "
+        "nobody can get into your account without the code.\n\n"
+        "SYNAPSE by HumanForm Studios"
+    )
+    message.add_alternative(
+        f"""<!doctype html><html><body style="margin:0;background:#f5f5f5;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0a0a0a">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" style="max-width:440px;background:#ffffff;border:1px solid #e5e5e5;border-radius:16px">
+<tr><td style="padding:28px 28px 8px;font:600 18px Georgia,serif">SYNAPSE</td></tr>
+<tr><td style="padding:8px 28px;font-size:15px;line-height:1.6">Your code to {action}:</td></tr>
+<tr><td style="padding:8px 28px 4px"><div style="font:600 34px/1.2 ui-monospace,Consolas,monospace;letter-spacing:8px;background:#f5f5f5;border-radius:12px;padding:14px 18px;text-align:center">{code}</div></td></tr>
+<tr><td style="padding:12px 28px 28px;font-size:13px;line-height:1.6;color:#525252">It expires in {OTP_TTL_MINUTES} minutes. If you didn't ask for it, ignore this email; nobody can get into your account without the code.</td></tr>
+</table>
+<p style="font-size:12px;color:#737373;margin:16px 0 0">SYNAPSE by HumanForm Studios</p>
+</td></tr></table></body></html>""",
+        subtype="html",
+    )
+    if OTP_DEBUG and not SMTP_HOST:
+        print(f"[OTP_DEBUG] email to {to} ({purpose}): {code}", flush=True)
+        return
+    try:
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+                if SMTP_USER:
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(message)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+                server.starttls()
+                if SMTP_USER:
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(message)
+    except Exception as exc:
+        traceback.print_exc()
+        raise HTTPException(status_code=502, detail="We couldn't send the email right now. Please try again.") from exc
+
+
+def _twilio(path: str, data: dict):
+    return requests.post(
+        f"https://verify.twilio.com/v2/Services/{TWILIO_VERIFY_SID}/{path}",
+        data=data,
+        auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN),
+        timeout=20,
+    )
+
+
+def send_code_sms(to: str):
+    if OTP_DEBUG and not TWILIO_VERIFY_SID:
+        return  # the debug code is printed by issue_code
+    try:
+        response = _twilio("Verifications", {"To": to, "Channel": "sms"})
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="We couldn't send the text message right now. Please try again.") from exc
+    if not response.ok:
+        print("Twilio Verify error:", response.status_code, response.text[:300], flush=True)
+        detail = "We couldn't send a text to that number. Check it and try again."
+        if response.status_code == 429:
+            detail = "Too many codes were sent to that number. Please wait a while and try again."
+        raise HTTPException(status_code=502, detail=detail)
+
+
+def check_code_sms(to: str, code: str) -> bool:
+    try:
+        response = _twilio("VerificationCheck", {"To": to, "Code": code})
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="We couldn't check the code right now. Please try again.") from exc
+    return response.ok and response.json().get("status") == "approved"
+
+
+def issue_code(channel: str, destination: str, purpose: str, user_id: Optional[int]):
+    """Rate-limits, stores and sends one code. Returns seconds until a resend is allowed."""
+
+    if channel == "email" and not EMAIL_ENABLED:
+        raise HTTPException(status_code=503, detail="Email codes aren't set up on this server yet.")
+    if channel == "sms" and not SMS_ENABLED:
+        raise HTTPException(status_code=503, detail="Text message codes aren't set up on this server yet.")
+
+    now = datetime.now(timezone.utc)
+    with get_connection() as connection:
+        recent = connection.execute(
+            """
+            SELECT created_at FROM otp_codes
+            WHERE destination = ? AND created_at > ?
+            ORDER BY id DESC
+            """,
+            (destination, (now - timedelta(hours=1)).isoformat()),
+        ).fetchall()
+    if recent:
+        wait = OTP_RESEND_SECONDS - (now - parse_time(recent[0]["created_at"])).total_seconds()
+        if wait > 0:
+            raise HTTPException(status_code=429, detail=f"Please wait {int(wait) + 1} seconds before asking for another code.")
+        if len(recent) >= OTP_MAX_PER_HOUR:
+            raise HTTPException(status_code=429, detail="Too many codes were requested. Please try again in an hour.")
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    if channel == "email":
+        send_code_email(destination, code, purpose)
+        stored = _code_hash(destination, purpose, code)
+    else:
+        send_code_sms(destination)
+        # Twilio Verify keeps the real code; locally (debug) we keep our own.
+        stored = _code_hash(destination, purpose, code) if (OTP_DEBUG and not TWILIO_VERIFY_SID) else "twilio"
+        if OTP_DEBUG and not TWILIO_VERIFY_SID:
+            print(f"[OTP_DEBUG] sms to {destination} ({purpose}): {code}", flush=True)
+
+    with get_connection() as connection:
+        # A new code replaces older unused ones for the same purpose.
+        connection.execute(
+            "UPDATE otp_codes SET used_at = ? WHERE destination = ? AND purpose = ? AND used_at IS NULL",
+            (now.isoformat(), destination, purpose),
+        )
+        connection.execute(
+            """
+            INSERT INTO otp_codes
+            (channel, destination, purpose, code_hash, user_id, attempts, expires_at, used_at, created_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?, NULL, ?)
+            """,
+            (channel, destination, purpose, stored, user_id,
+             (now + timedelta(minutes=OTP_TTL_MINUTES)).isoformat(), now.isoformat()),
+        )
+        connection.commit()
+    return OTP_RESEND_SECONDS
+
+
+def consume_code(channel: str, destination: str, purpose: str, code: str):
+    """Checks a code; returns the stored row (with user_id) or raises 400/429."""
+
+    code = _re.sub(r"\D", "", code or "")
+    now = datetime.now(timezone.utc)
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id, code_hash, user_id, attempts, expires_at FROM otp_codes
+            WHERE destination = ? AND purpose = ? AND used_at IS NULL
+            ORDER BY id DESC LIMIT 1
+            """,
+            (destination, purpose),
+        ).fetchone()
+    if not row or parse_time(row["expires_at"]) < now:
+        raise HTTPException(status_code=400, detail="That code has expired. Ask for a new one.")
+    if row["attempts"] >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many wrong tries. Ask for a new code.")
+    if len(code) != 6:
+        raise HTTPException(status_code=400, detail="Enter the 6-digit code.")
+
+    if row["code_hash"] == "twilio":
+        valid = check_code_sms(destination, code)
+    else:
+        valid = hmac.compare_digest(row["code_hash"], _code_hash(destination, purpose, code))
+
+    with get_connection() as connection:
+        if valid:
+            connection.execute("UPDATE otp_codes SET used_at = ? WHERE id = ?", (now.isoformat(), row["id"]))
+        else:
+            connection.execute("UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?", (row["id"],))
+        connection.commit()
+    if not valid:
+        left = OTP_MAX_ATTEMPTS - row["attempts"] - 1
+        raise HTTPException(
+            status_code=400,
+            detail=f"That code isn't right. {left} {'try' if left == 1 else 'tries'} left." if left > 0
+            else "That code isn't right. Ask for a new code.",
+        )
+    return row
+
+
+def validate_new_password(password: str):
+    size = len((password or "").encode("utf-8"))
+    if size < 8:
+        raise HTTPException(status_code=400, detail="Password must contain at least 8 UTF-8 bytes.")
+    if size > 72:
+        raise HTTPException(status_code=400, detail="Password is too long. Maximum is 72 UTF-8 bytes.")
+
+
+class OtpSendRequest(BaseModel):
+    destination: str = Field(min_length=3, max_length=254)
+    purpose: str = Field(pattern="^(login|reset)$")
+
+
+class OtpVerifyRequest(BaseModel):
+    destination: str = Field(min_length=3, max_length=254)
+    purpose: str = Field(pattern="^(login|reset)$")
+    code: str = Field(min_length=4, max_length=12)
+    new_password: Optional[str] = Field(default=None, max_length=200)
+
+
+class PhoneSendRequest(BaseModel):
+    phone: str = Field(min_length=6, max_length=32)
+
+
+class PhoneVerifyRequest(BaseModel):
+    phone: str = Field(min_length=6, max_length=32)
+    code: str = Field(min_length=4, max_length=12)
+
+
+@app.get("/api/auth/otp/channels")
+def otp_channels():
+    """Which kinds of codes this server can send (the sign-in screen uses it)."""
+    return {"email": EMAIL_ENABLED, "sms": SMS_ENABLED, "default_country": OTP_DEFAULT_COUNTRY}
+
+
+@app.post("/api/auth/otp/send")
+def otp_send(payload: OtpSendRequest):
+    """Sends a sign-in or password-reset code. The reply is the same whether or
+    not an account exists, so it can't be used to find out who has one."""
+
+    channel, destination = parse_destination(payload.destination)
+    user = user_for_destination(channel, destination)
+    resend_in = OTP_RESEND_SECONDS
+    if user:
+        resend_in = issue_code(channel, destination, payload.purpose, user["id"])
+    elif channel == "email" and not EMAIL_ENABLED or channel == "sms" and not SMS_ENABLED:
+        issue_code(channel, destination, payload.purpose, None)  # raises the "not set up" error
+    return {
+        "sent": True,
+        "channel": channel,
+        "destination": destination,
+        "masked": mask_destination(channel, destination),
+        "resend_in": resend_in,
+        "expires_in": OTP_TTL_MINUTES * 60,
+    }
+
+
+@app.post("/api/auth/otp/verify")
+def otp_verify(payload: OtpVerifyRequest):
+    """Checks a code. Sign-in codes return a session; reset codes also set the new password."""
+
+    channel, destination = parse_destination(payload.destination)
+    if payload.purpose == "reset":
+        validate_new_password(payload.new_password or "")
+    row = consume_code(channel, destination, payload.purpose, payload.code)
+    user = user_for_destination(channel, destination)
+    if not user or (row["user_id"] and row["user_id"] != user["id"]):
+        raise HTTPException(status_code=400, detail="That code has expired. Ask for a new one.")
+
+    if payload.purpose == "reset":
+        with get_connection() as connection:
+            connection.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (pwd_context.hash(payload.new_password), user["id"]),
+            )
+            connection.commit()
+
+    return {
+        "message": "Password updated." if payload.purpose == "reset" else "Signed in.",
+        "access_token": create_access_token(user["email"]),
+        "token_type": "bearer",
+        "user": public_user(user),
+    }
+
+
+@app.get("/api/account/phone")
+def get_phone(authorization: Optional[str] = Header(default=None)):
+    user = require_user(authorization)
+    with get_connection() as connection:
+        row = connection.execute("SELECT phone, verified_at FROM user_phones WHERE user_id = ?", (user["id"],)).fetchone()
+    return {
+        "phone": row["phone"] if row else None,
+        "masked": mask_destination("sms", row["phone"]) if row else None,
+        "verified_at": row["verified_at"] if row else None,
+        "sms_enabled": SMS_ENABLED,
+        "default_country": OTP_DEFAULT_COUNTRY,
+    }
+
+
+@app.post("/api/account/phone/send")
+def phone_send(payload: PhoneSendRequest, authorization: Optional[str] = Header(default=None)):
+    user = require_user(authorization)
+    phone = normalize_phone(payload.phone)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Please enter a valid mobile number, e.g. +91 98765 43210.")
+    with get_connection() as connection:
+        taken = connection.execute("SELECT user_id FROM user_phones WHERE phone = ?", (phone,)).fetchone()
+    if taken and taken["user_id"] != user["id"]:
+        raise HTTPException(status_code=409, detail="That number is already linked to another SYNAPSE account.")
+    resend_in = issue_code("sms", phone, "phone", user["id"])
+    return {"sent": True, "phone": phone, "masked": mask_destination("sms", phone), "resend_in": resend_in}
+
+
+@app.post("/api/account/phone/verify")
+def phone_verify(payload: PhoneVerifyRequest, authorization: Optional[str] = Header(default=None)):
+    user = require_user(authorization)
+    phone = normalize_phone(payload.phone)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Please enter a valid mobile number.")
+    row = consume_code("sms", phone, "phone", payload.code)
+    if row["user_id"] != user["id"]:
+        raise HTTPException(status_code=400, detail="That code has expired. Ask for a new one.")
+    now = utc_now()
+    try:
+        with get_connection() as connection:
+            connection.execute("DELETE FROM user_phones WHERE user_id = ?", (user["id"],))
+            connection.execute(
+                "INSERT INTO user_phones (user_id, phone, verified_at) VALUES (?, ?, ?)",
+                (user["id"], phone, now),
+            )
+            connection.commit()
+    except duplicate_key_errors():
+        raise HTTPException(status_code=409, detail="That number is already linked to another SYNAPSE account.")
+    return {"phone": phone, "masked": mask_destination("sms", phone), "verified_at": now}
+
+
+@app.delete("/api/account/phone")
+def remove_phone(authorization: Optional[str] = Header(default=None)):
+    user = require_user(authorization)
+    with get_connection() as connection:
+        connection.execute("DELETE FROM user_phones WHERE user_id = ?", (user["id"],))
+        connection.commit()
+    return {"removed": True}
+
 
 # ============================================================
 # 9b. SIGN IN WITH GOOGLE
@@ -3894,7 +4342,7 @@ def delete_account(
             """,
             (user_id,),
         )
-        for table in ("conversations", "credit_usage", "subscriptions", "chat_stops", "user_settings", "razorpay_subscriptions"):
+        for table in ("conversations", "credit_usage", "subscriptions", "chat_stops", "user_settings", "razorpay_subscriptions", "user_phones", "otp_codes"):
             connection.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         # Payment records are kept for accounting, unlinked from the deleted account.
         connection.execute("UPDATE payments SET user_id = 0 WHERE user_id = ?", (user_id,))

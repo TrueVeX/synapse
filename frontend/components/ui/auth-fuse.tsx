@@ -10,7 +10,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import * as LabelPrimitive from "@radix-ui/react-label";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Eye, EyeOff, Globe, Layers, Loader2, Mic, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Globe, KeyRound, Layers, Loader2, Mic, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { API_URL, TOKEN_KEY } from "@/lib/api";
 import { GOOGLE_CLIENT_ID, getGoogleAccessToken, isInsideApp } from "@/lib/google";
@@ -125,13 +125,20 @@ Input.displayName = "Input";
 
 export interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
+  /** Shown at the right of the label (e.g. "Forgot password?"). */
+  action?: React.ReactNode;
 }
-const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(({ className, label, ...props }, ref) => {
+const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(({ className, label, action, ...props }, ref) => {
   const id = useId();
   const [showPassword, setShowPassword] = useState(false);
   return (
     <div className="grid w-full items-center gap-2">
-      {label && <Label htmlFor={id}>{label}</Label>}
+      {(label || action) && (
+        <div className="flex items-center justify-between gap-2">
+          {label && <Label htmlFor={id}>{label}</Label>}
+          {action}
+        </div>
+      )}
       <div className="relative">
         <Input id={id} type={showPassword ? "text" : "password"} className={cn("pe-11", className)} ref={ref} {...props} />
         <button
@@ -176,7 +183,7 @@ function finish(token: string) {
   window.location.href = nextPath();
 }
 
-function AuthForm({ mode }: { mode: Mode }) {
+function AuthForm({ mode, onForgot, onCode }: { mode: Mode; onForgot?: () => void; onCode?: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -228,6 +235,13 @@ function AuthForm({ mode }: { mode: Mode }) {
         <PasswordInput
           name="password"
           label="Password"
+          action={
+            !signUp && onForgot ? (
+              <button type="button" onClick={onForgot} className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                Forgot password?
+              </button>
+            ) : null
+          }
           required
           minLength={signUp ? 8 : undefined}
           autoComplete={signUp ? "new-password" : "current-password"}
@@ -244,12 +258,218 @@ function AuthForm({ mode }: { mode: Mode }) {
           {busy && <Loader2 className="animate-spin" />}
           {busy ? (signUp ? "Creating account…" : "Signing in…") : signUp ? "Create account" : "Sign in"}
         </Button>
+        {!signUp && onCode && (
+          <Button type="button" variant="outline" onClick={onCode}>
+            <KeyRound /> Sign in with a code
+          </Button>
+        )}
       </div>
     </form>
   );
 }
 
+// ---------------------------------------------------------------------------
+// One-time codes: sign in with a code, and forgot password
+
+type Channels = { email: boolean; sms: boolean; default_country: string };
+
+function CodeFlow({ purpose, onBack }: { purpose: "login" | "reset"; onBack: () => void }) {
+  const [channels, setChannels] = useState<Channels>({ email: true, sms: false, default_country: "+91" });
+  const [destination, setDestination] = useState("");
+  const [sent, setSent] = useState<{ destination: string; masked: string; channel: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [wait, setWait] = useState(0);
+  const reset = purpose === "reset";
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/auth/otp/channels`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setChannels(data))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [wait]);
+
+  const label = channels.sms ? "Email or mobile number" : "Email";
+  const placeholder = channels.sms ? `you@example.com or ${channels.default_country} 98765 43210` : "you@example.com";
+
+  async function send(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setError("");
+    setInfo("");
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/otp/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: sent?.destination ?? destination, purpose }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(readError(data, "We couldn't send a code."));
+      setSent({ destination: data.destination, masked: data.masked, channel: data.channel });
+      setWait(data.resend_in ?? 45);
+      if (sent) setInfo("A new code is on its way.");
+    } catch (err) {
+      setError(err instanceof TypeError ? "Can't reach SYNAPSE right now. Please try again." : err instanceof Error ? err.message : "Something went wrong.");
+    }
+    setBusy(false);
+  }
+
+  async function verify(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!sent) return;
+    setError("");
+    setInfo("");
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_URL}/api/auth/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: sent.destination, purpose, code, new_password: reset ? password : undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(readError(data, "That code didn't work."));
+      if (reset) setInfo("Password updated. Signing you in…");
+      finish(data.access_token);
+    } catch (err) {
+      setError(err instanceof TypeError ? "Can't reach SYNAPSE right now. Please try again." : err instanceof Error ? err.message : "Something went wrong.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-7">
+      <div className="relative flex flex-col items-center gap-2 text-center">
+        <button
+          type="button"
+          onClick={onBack}
+          className="absolute left-0 top-0 inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Back to sign in"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+        <SynapseMark size={36} className="mb-1" />
+        <h1 className="font-serif text-[1.75rem] font-normal leading-tight text-card-foreground">
+          {reset ? "Reset your password" : "Sign in with a code"}
+        </h1>
+        <p className="text-balance text-sm text-muted-foreground">
+          {sent
+            ? `Enter the 6-digit code we sent to ${sent.masked}.`
+            : reset
+              ? "We'll send a 6-digit code so you can choose a new password."
+              : "We'll send a 6-digit code. No password needed."}
+        </p>
+      </div>
+
+      {!sent ? (
+        <form onSubmit={send} className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="destination">{label}</Label>
+            <Input
+              id="destination"
+              name="username"
+              type={channels.sms ? "text" : "email"}
+              inputMode={channels.sms ? "text" : "email"}
+              placeholder={placeholder}
+              autoComplete={channels.sms ? "username" : "email"}
+              required
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              autoFocus
+            />
+            {channels.sms && (
+              <p className="text-xs text-muted-foreground">Text codes work for numbers you've added in Settings → Account.</p>
+            )}
+          </div>
+          {error && (
+            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={busy || !destination.trim()}>
+            {busy && <Loader2 className="animate-spin" />}
+            {busy ? "Sending…" : "Send code"}
+          </Button>
+        </form>
+      ) : (
+        <form onSubmit={verify} className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="code">Code</Label>
+            <Input
+              id="code"
+              name="one-time-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="••••••"
+              required
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="h-14 text-center font-mono text-2xl tracking-[0.6em]"
+              autoFocus
+            />
+          </div>
+          {reset && (
+            <PasswordInput
+              name="new-password"
+              label="New password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
+          {error && (
+            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          {info && <p className="text-center text-sm text-muted-foreground">{info}</p>}
+          <Button type="submit" disabled={busy || code.length !== 6 || (reset && password.length < 8)}>
+            {busy && <Loader2 className="animate-spin" />}
+            {busy ? "Checking…" : reset ? "Set new password" : "Sign in"}
+          </Button>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                setSent(null);
+                setCode("");
+                setError("");
+                setInfo("");
+              }}
+              className="underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Use a different {channels.sms ? "email or number" : "email"}
+            </button>
+            <button
+              type="button"
+              disabled={wait > 0 || busy}
+              onClick={() => void send()}
+              className="underline-offset-4 hover:text-foreground hover:underline disabled:no-underline disabled:opacity-60"
+            >
+              {wait > 0 ? `Resend in ${wait}s` : "Resend code"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle: () => void }) {
+  const [view, setView] = useState<"form" | "login" | "reset">("form");
   const [showGoogle, setShowGoogle] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleError, setGoogleError] = useState("");
@@ -277,14 +497,25 @@ function AuthFormContainer({ isSignIn, onToggle }: { isSignIn: boolean; onToggle
 
   return (
     <div className="glass-strong glass-sheen mx-auto grid w-full max-w-[400px] gap-3 rounded-[28px] p-6 sm:p-8">
-      <AuthForm key={isSignIn ? "signin" : "signup"} mode={isSignIn ? "signin" : "signup"} />
+      {view !== "form" ? (
+        <CodeFlow key={view} purpose={view} onBack={() => setView("form")} />
+      ) : (
+        <AuthForm
+          key={isSignIn ? "signin" : "signup"}
+          mode={isSignIn ? "signin" : "signup"}
+          onForgot={() => setView("reset")}
+          onCode={() => setView("login")}
+        />
+      )}
+      {view === "form" && (
       <div className="text-center text-sm text-muted-foreground">
         {isSignIn ? "New to SYNAPSE?" : "Already have an account?"}
         <Button variant="link" type="button" className="h-auto px-1.5 py-2" onClick={onToggle}>
           {isSignIn ? "Create an account" : "Sign in"}
         </Button>
       </div>
-      {showGoogle && (
+      )}
+      {showGoogle && view === "form" && (
         <>
           <div className="relative text-center text-xs uppercase tracking-wider text-muted-foreground after:absolute after:inset-x-0 after:top-1/2 after:border-t after:border-border">
             <span className="relative z-10 rounded-full bg-popover px-2.5 py-0.5">Or continue with</span>
