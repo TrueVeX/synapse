@@ -425,7 +425,7 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
   const heading = HEADINGS[step](mode, purpose);
   const busy = modal.status !== "closed";
   const title = (
-    <motion.div key={`title-${step}-${mode}`} initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: "easeOut" }} className="flex w-full flex-col items-center gap-3 text-center">
+    <motion.div key={`title-${step}-${mode}`} initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: "easeOut" }} className="flex w-[min(calc(100vw-2.5rem),40rem)] flex-col items-center gap-3 text-center">
       <BlurFade delay={step === "email" ? 0.2 : 0} className="w-full">
         <h1 className="text-balance font-serif text-[2.1rem] font-light leading-[1.1] tracking-tight text-foreground sm:text-5xl">{heading.title}</h1>
       </BlurFade>
