@@ -2458,9 +2458,9 @@ def related_questions(
 # ============================================================
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
-# Default voice: "Rachel" (calm, clear). Any voice id from your ElevenLabs
-# voice library works here.
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM").strip()
+# Default voice: "Sarah" (soft, warm), one of ElevenLabs' default voices,
+# which work on the free plan (Voice Library voices need a paid plan for the API).
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL").strip() or "EXAVITQu4vr4xnSDxMaL"
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5").strip()
 
 LIVE_MAX_IMAGE_BYTES = 4 * 1024 * 1024
