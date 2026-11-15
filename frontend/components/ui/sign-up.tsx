@@ -501,7 +501,7 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
         <div className="absolute inset-0 z-0">
           <GradientBackground />
         </div>
-        <fieldset disabled={busy} className="relative z-10 mx-auto flex w-full max-w-[22rem] flex-col items-center gap-8 px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-24">
+        <fieldset disabled={busy} className="relative z-10 mx-auto flex w-full min-w-0 max-w-[22rem] flex-col items-center gap-8 px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-24">
           <AnimatePresence mode="wait">{title}</AnimatePresence>
 
           {step === "email" && showGoogle && (
