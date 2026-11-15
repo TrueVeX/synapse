@@ -252,3 +252,67 @@ export async function streamChat(
 
   flush(buffer + decoder.decode());
 }
+
+// ---- Live mode -------------------------------------------------------------
+
+export type LiveConfig = { voice: "elevenlabs" | "browser"; search: boolean };
+
+export type LiveEvent =
+  | { type: "meta"; conversation_id: string }
+  | { type: "status"; stage: "searching"; query?: string }
+  | { type: "delta"; text: string }
+  | { type: "done"; conversation_id: string }
+  | { type: "error"; message: string };
+
+/** Sends one spoken Live turn (text + optional camera/screen frame) and streams the reply. */
+export async function streamLiveTurn(form: FormData, onEvent: (event: LiveEvent) => void, signal: AbortSignal) {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/live/turn`, { method: "POST", headers: authHeaders(), body: form, signal });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw networkError();
+  }
+  if (!response.ok) throw await toApiError(response);
+  if (!response.body) throw new ApiError("This browser cannot read streamed answers.", 0);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const flush = (line: string) => {
+    if (!line.trim()) return;
+    try {
+      onEvent(JSON.parse(line) as LiveEvent);
+    } catch {
+      /* ignore a malformed line */
+    }
+  };
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      flush(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+    }
+  }
+  flush(buffer + decoder.decode());
+}
+
+/** ElevenLabs speech for one sentence (MP3), or null when it isn't available. */
+export async function fetchLiveSpeech(text: string, signal: AbortSignal): Promise<Blob | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/live/speak`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ text }),
+      signal,
+    });
+    if (!response.ok) return null;
+    return await response.blob();
+  } catch {
+    return null;
+  }
+}

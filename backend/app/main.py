@@ -2449,6 +2449,218 @@ def related_questions(
     return {"questions": questions}
 
 
+# ============================================================
+# 14d. LIVE MODE (spoken conversation with camera / screen)
+# The browser listens (speech recognition), sends each spoken turn here with
+# an optional snapshot of the user's camera or shared screen, and reads the
+# reply aloud: with ElevenLabs when ELEVENLABS_API_KEY is set, otherwise
+# with the device's built-in voice.
+# ============================================================
+
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
+# Default voice: "Rachel" (calm, clear). Any voice id from your ElevenLabs
+# voice library works here.
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM").strip()
+ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5").strip()
+
+LIVE_MAX_IMAGE_BYTES = 4 * 1024 * 1024
+LIVE_SYSTEM_PROMPT = (
+    SYSTEM_PROMPT
+    + " You are in Live mode: a real-time spoken conversation, like a phone call. "
+    "Your reply is read aloud, so talk like a friendly, natural person: usually one to "
+    "three short sentences, longer only when the user asks for detail. Never use "
+    "Markdown, lists, headings, tables, emojis, URLs or citation markers like [1]. "
+    "When an image is attached, it is what the user is showing you right now through "
+    "their camera or shared screen: use it naturally (\"I can see...\") and say so if "
+    "it's unclear. Reply in the language the user speaks."
+)
+
+
+@app.get("/api/live/config")
+def live_config(authorization: Optional[str] = Header(default=None)):
+    """Tells Live mode which voice to use and whether web search is available."""
+
+    require_user(authorization)
+    return {
+        "voice": "elevenlabs" if ELEVENLABS_API_KEY else "browser",
+        "search": bool(TAVILY_API_KEY),
+    }
+
+
+@app.post("/api/live/turn")
+async def live_turn(
+    text: str = Form(...),
+    conversation_id: str = Form(""),
+    source: str = Form(""),
+    image: Optional[UploadFile] = File(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    """One spoken turn. Streams newline-delimited JSON:
+    meta -> status(searching)? -> delta* -> done | error.
+    Uses the same credits as a Web research answer; failed turns are refunded."""
+
+    user = require_user(authorization)
+    user_id = user["id"]
+    question = " ".join(text.split())[:2000]
+    if not question:
+        raise HTTPException(status_code=400, detail="Say something first.")
+
+    image_inputs = []
+    if image is not None:
+        data = await image.read()
+        if len(data) > LIVE_MAX_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail="That frame is too large.")
+        if data:
+            mime = image.content_type if (image.content_type or "").startswith("image/") else "image/jpeg"
+            image_inputs.append({"data_url": f"data:{mime};base64,{base64.b64encode(data).decode()}"})
+
+    conversation_id = conversation_id.strip()
+    existing = get_owned_conversation(conversation_id, user_id) if conversation_id else None
+    history = []
+    if existing:
+        with get_connection() as connection:
+            rows = connection.execute(
+                "SELECT role, content FROM messages WHERE conversation_id = ? ORDER BY id",
+                (conversation_id,),
+            ).fetchall()
+        history = [
+            {"role": r["role"], "content": r["content"][:MAX_HISTORY_CHARS]}
+            for r in rows[-MAX_HISTORY_MESSAGES:]
+            if r["content"].strip()
+        ]
+
+    window_key, cost = charge_credits(user_id, "web", 0)
+    personal = personalization_prompt(user, load_settings(user_id))
+
+    # Save the spoken question (and start a chat for the first turn).
+    now = utc_now()
+    seen = {"camera": "Camera view", "screen": "Shared screen"}.get(source)
+    with get_connection() as connection:
+        if not existing:
+            conversation_id = uuid.uuid4().hex
+            connection.execute(
+                "INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (conversation_id, user_id, ("Live: " + make_title(question))[:200], now, now),
+            )
+        cursor = connection.execute(
+            """
+            INSERT INTO messages
+            (conversation_id, role, content, sources, attachments, mode, thinking, created_at)
+            VALUES (?, 'user', ?, '[]', ?, 'live', '', ?)
+            """,
+            (conversation_id, question, json.dumps([seen] if seen and image_inputs else []), now),
+        )
+        user_message_id = cursor.lastrowid
+        connection.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, conversation_id))
+        connection.commit()
+
+    def events():
+        parts = []
+        sources = []
+        try:
+            yield json.dumps({"type": "meta", "conversation_id": conversation_id}) + "\n"
+
+            # A quick web search only when the question needs fresh facts.
+            # With a camera/screen frame the question is usually about what's on
+            # show ("what is this right now?"), so only search when asked to.
+            wants_web = needs_web_search(question, question, "web") and (
+                not image_inputs
+                or _re.search(r"\b(search|look (it )?up|google|online|on the (web|internet)|news|price|latest)\b", question, _re.I)
+            )
+            if TAVILY_API_KEY and wants_web:
+                yield json.dumps({"type": "status", "stage": "searching", "query": question}) + "\n"
+                try:
+                    sources = search_web(question, "web")[:4]
+                except HTTPException:
+                    sources = []
+
+            prompt = question
+            if sources:
+                prompt += (
+                    f"\n\nToday's date is {datetime.now(timezone.utc).strftime('%d %B %Y')}. "
+                    "Fresh web results for this question (use them; you may mention a source "
+                    "by name, e.g. 'according to Reuters', but never read out links or numbers in brackets):\n"
+                    + "\n\n".join(
+                        f"{s['title']} ({_domain(s['url'])}): {(s.get('content') or '')[:600]}"
+                        for s in sources
+                    )
+                )
+
+            messages = [
+                {"role": "system", "content": f"{LIVE_SYSTEM_PROMPT}\n\n{personal}"},
+                *history,
+                {"role": "user", "content": build_user_content(prompt, image_inputs)},
+            ]
+            for kind, piece in stream_openrouter(messages, "off"):
+                if kind == "delta":
+                    parts.append(piece)
+                    yield json.dumps({"type": "delta", "text": piece}) + "\n"
+
+            answer = "".join(parts).strip()
+            if not answer:
+                raise ChatError("I didn't catch a reply there. Please try again.")
+            save_assistant_message(conversation_id, user_message_id, answer, public_sources(sources), "live", "")
+            yield json.dumps({"type": "done", "conversation_id": conversation_id}) + "\n"
+        except ChatError as exc:
+            if not parts:
+                refund_credits(user_id, window_key, cost)
+            yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+        except Exception:
+            traceback.print_exc()
+            if not parts:
+                refund_credits(user_id, window_key, cost)
+            yield json.dumps({"type": "error", "message": "Something went wrong. Please try again."}) + "\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+class SpeakRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1200)
+
+
+@app.post("/api/live/speak")
+def live_speak(payload: SpeakRequest, authorization: Optional[str] = Header(default=None)):
+    """Reads text aloud with ElevenLabs (MP3 stream). 404 when no key is set,
+    so the app uses the device's built-in voice instead."""
+
+    require_user(authorization)
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(status_code=404, detail="ElevenLabs voice is not configured.")
+    try:
+        upstream = requests.post(
+            f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}/stream",
+            params={"output_format": "mp3_44100_64"},
+            headers={"xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json"},
+            json={
+                "text": payload.text,
+                "model_id": ELEVENLABS_MODEL,
+                "voice_settings": {"stability": 0.45, "similarity_boost": 0.8},
+            },
+            stream=True,
+            timeout=(10, 60),
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Could not reach ElevenLabs.") from exc
+    if not upstream.ok:
+        detail = upstream.text[:300]
+        upstream.close()
+        raise HTTPException(status_code=502, detail=f"ElevenLabs error ({upstream.status_code}): {detail}")
+
+    def audio():
+        try:
+            for chunk in upstream.iter_content(chunk_size=4096):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    return StreamingResponse(audio(), media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
+
 @app.post("/api/chat/stop")
 def stop_generation(
     payload: StopGenerationRequest,

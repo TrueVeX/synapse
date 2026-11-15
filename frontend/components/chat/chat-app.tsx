@@ -30,6 +30,7 @@ import { Sidebar } from "./sidebar";
 import { SynapseMark } from "./synapse-mark";
 import { resetLabel } from "./credit-meter";
 import { SettingsDialog } from "./settings-dialog";
+import { LiveMode } from "./live-mode";
 
 const EASE = [0.2, 0, 0, 1] as const;
 
@@ -192,6 +193,7 @@ export default function ChatApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Follow-up suggestions for the latest answer ("Related").
   const [related, setRelated] = useState<{ key: string; questions: string[] } | null>(null);
+  const [liveOpen, setLiveOpen] = useState(false);
 
   const activeIdRef = useRef<string | null>(null);
   const streamingRef = useRef(false);
@@ -714,6 +716,7 @@ export default function ChatApp() {
         prefill={position === "center" ? prefill : undefined}
         footerText={position === "bottom" ? "SYNAPSE can make mistakes. Please double-check responses." : ""}
         onSendMessage={send}
+        onLive={() => setLiveOpen(true)}
       />
     </motion.div>
   );
@@ -739,6 +742,21 @@ export default function ChatApp() {
         }}
         billing={billing}
       />
+
+      <AnimatePresence>
+        {liveOpen && (
+          <LiveMode
+            onClose={(conversationId) => {
+              setLiveOpen(false);
+              // Show the Live chat (its transcript) and refresh the list.
+              api<{ conversations: Conversation[] }>("/api/conversations")
+                .then((list) => setConversations(list.conversations))
+                .catch(() => {});
+              if (conversationId) navigate(conversationId);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <SettingsDialog
         open={settingsOpen}

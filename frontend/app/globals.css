@@ -671,3 +671,32 @@ html[data-live-bg="off"] .live-bg__blob { animation: none; }
 /* The lines are drawn on a canvas; its CSS colour sets the line colour. */
 .floating-paths { position: absolute; inset: 0; width: 100%; height: 100%; color: #000; }
 .dark .floating-paths { color: #fff; }
+
+/* ---------- Live mode orb ---------- */
+.live-orb {
+  --level: 0;
+  background: radial-gradient(circle at 35% 30%,
+    color-mix(in oklch, var(--foreground) 96%, transparent) 0%,
+    color-mix(in oklch, var(--foreground) 45%, transparent) 45%,
+    color-mix(in oklch, var(--foreground) 10%, transparent) 72%,
+    transparent 74%);
+  box-shadow: 0 0 calc(30px + var(--level) * 90px) color-mix(in oklch, var(--foreground) 28%, transparent);
+  transform: scale(calc(1 + var(--level) * 0.22));
+  transition: transform 0.08s linear, box-shadow 0.08s linear, opacity 0.3s ease;
+}
+.live-orb::before,
+.live-orb::after {
+  content: ""; position: absolute; inset: 0; border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--foreground) 35%, transparent);
+  opacity: 0; pointer-events: none;
+}
+.live-orb--starting, .live-orb--thinking { animation: live-breathe 1.6s ease-in-out infinite; }
+.live-orb--speaking::before { animation: live-ring 1.8s ease-out infinite; }
+.live-orb--speaking::after { animation: live-ring 1.8s ease-out 0.9s infinite; }
+.live-orb--speaking { animation: live-breathe 0.9s ease-in-out infinite; }
+.live-orb--muted { opacity: 0.35; }
+@keyframes live-breathe { 0%, 100% { transform: scale(0.96); } 50% { transform: scale(1.05); } }
+@keyframes live-ring { from { transform: scale(1); opacity: 0.6; } to { transform: scale(1.7); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .live-orb, .live-orb::before, .live-orb::after { animation: none !important; transition: none; }
+}

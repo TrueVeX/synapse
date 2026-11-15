@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Square, Mic } from "lucide-react";
+import { Plus, ChevronDown, ArrowUp, X, FileText, Loader2, Check, Archive, Square, Mic, AudioLines } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* --- ICONS --- */
@@ -271,6 +271,8 @@ interface ClaudeChatInputProps {
     // SYNAPSE chat: fill the box from outside (suggestion chips); change `nonce` to apply
     prefill?: { text: string; nonce: number };
     className?: string;
+    // SYNAPSE: start Live mode (voice, camera and screen); shown when the box is empty
+    onLive?: () => void;
 }
 
 export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
@@ -285,6 +287,7 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
     onStop,
     prefill,
     className,
+    onLive,
 }) => {
     const [message, setMessage] = useState("");
     const [files, setFiles] = useState<AttachedFile[]>([]);
@@ -569,6 +572,16 @@ export const ClaudeChatInput: React.FC<ClaudeChatInputProps> = ({
                                     title="Stop response"
                                 >
                                     <Square className="w-3 h-3 fill-current" />
+                                </button>
+                                ) : !hasContent && onLive ? (
+                                <button
+                                    onClick={onLive}
+                                    className="inline-flex items-center justify-center relative shrink-0 transition-colors !h-9 !w-9 !rounded-full active:scale-95 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md"
+                                    type="button"
+                                    aria-label="Start Live: talk with SYNAPSE"
+                                    title="Live: talk, show your camera or screen"
+                                >
+                                    <AudioLines className="w-[18px] h-[18px]" />
                                 </button>
                                 ) : (
                                 <button

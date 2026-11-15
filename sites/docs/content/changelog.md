@@ -3,6 +3,15 @@ title: Changelog
 description: What's new in SYNAPSE.
 ---
 
+## November 15, 2026: Live mode
+
+- **Live mode**: talk with SYNAPSE out loud and show it your camera or screen. It answers by voice (ElevenLabs or your device's voice), checks the web when needed, and saves the conversation as a chat. See [Live mode](/live-mode).
+
+## November 10, 2026: Autonomous research
+
+- SYNAPSE now plans its own research: it writes its own searches, reads full pages, and checks conflicting sources before answering.
+- Much faster answers: searches run side by side and Web research answers start within seconds.
+
 ## 1.0.0: November 2026
 
 The first public release of SYNAPSE on the web, Windows and Android.

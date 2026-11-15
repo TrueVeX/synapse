@@ -22,7 +22,7 @@ const SITE = {
 
 // Sidebar order. Each page is content/<slug>.md ("index" is the home page).
 const NAV = [
-  { section: "Get started", pages: ["index", "getting-started", "reading-answers", "research-modes", "files-and-images"] },
+  { section: "Get started", pages: ["index", "getting-started", "reading-answers", "research-modes", "live-mode", "files-and-images"] },
   { section: "Plans and account", pages: ["plans-and-credits", "billing", "settings", "accounts"] },
   { section: "Apps", pages: ["apps"] },
   { section: "Trust and help", pages: ["privacy", "faq", "troubleshooting"] },
