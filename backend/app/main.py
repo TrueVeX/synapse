@@ -2459,10 +2459,10 @@ def related_questions(
 # ============================================================
 
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
-# Default voice: "Jessica" (young, playful, expressive, casual), one of
+# Default voice: "Chris" (male, casual, natural American), one of
 # ElevenLabs' default voices, which work on the free plan (Voice Library
 # voices need a paid plan for the API).
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9").strip() or "cgSgspJ2msm6clMCkdW9"
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "iP95p4xoKVk53GoZ742B").strip() or "iP95p4xoKVk53GoZ742B"
 ELEVENLABS_MODEL = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5").strip()
 
 LIVE_MAX_IMAGE_BYTES = 4 * 1024 * 1024
