@@ -743,3 +743,6 @@ html[data-live-bg="off"] .live-bg__blob { animation: none; }
 @keyframes auth-float1 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-10px, 10px); } }
 @keyframes auth-float2 { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(10px, -10px); } }
 @media (prefers-reduced-motion: reduce) { .auth-page svg g { animation: none !important; } }
+
+/* Google sign-in is blocked inside app windows: the apps hide it before first paint. */
+html[data-app="1"] .google-signin { display: none !important; }

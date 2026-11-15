@@ -29,7 +29,7 @@ import { AnimatePresence, motion, type Transition, type Variants } from "motion/
 import confetti, { type CreateTypes as ConfettiInstance, type Options as ConfettiOptions } from "canvas-confetti";
 import { cn } from "@/lib/utils";
 import { API_URL, TOKEN_KEY } from "@/lib/api";
-import { GOOGLE_CLIENT_ID, getGoogleAccessToken, isInsideApp } from "@/lib/google";
+import { GOOGLE_CLIENT_ID, getGoogleAccessToken } from "@/lib/google";
 import { nextPath, withNext } from "@/lib/next-url";
 import { SynapseMark } from "@/components/chat/synapse-mark";
 
@@ -276,7 +276,9 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
   const [modal, setModal] = useState<ModalState>({ status: "closed" });
   const [codesReady, setCodesReady] = useState(false);
   const [smsReady, setSmsReady] = useState(false);
-  const [showGoogle, setShowGoogle] = useState(false);
+  // Known at build time, so the button is in the page from the first paint
+  // (the apps hide it with CSS before anything is drawn: html[data-app]).
+  const showGoogle = Boolean(GOOGLE_CLIENT_ID);
   const confettiRef = useRef<ConfettiRef>(null);
   const signUp = mode === "signup";
 
@@ -287,7 +289,6 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
     } catch {
       /* storage unavailable */
     }
-    setShowGoogle(Boolean(GOOGLE_CLIENT_ID) && !isInsideApp());
     fetch(`${API_URL}/api/auth/otp/channels`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -505,7 +506,7 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
           <AnimatePresence mode="wait">{title}</AnimatePresence>
 
           {step === "email" && showGoogle && (
-            <BlurFade delay={0.6} className="flex w-full flex-col items-center gap-4">
+            <BlurFade delay={0.3} className="google-signin flex w-full flex-col items-center gap-4">
               <p className="text-sm font-medium text-muted-foreground">Continue with</p>
               <GlassButton type="button" onClick={() => void google()} contentClassName="flex items-center justify-center gap-2" size="sm">
                 <GoogleIcon />
@@ -531,7 +532,7 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
             <AnimatePresence mode="wait">
               {step === "email" && (
                 <motion.div key="email" exit={{ opacity: 0, filter: "blur(4px)" }} transition={{ duration: 0.25 }}>
-                  <BlurFade delay={showGoogle ? 0.8 : 0.5}>
+                  <BlurFade delay={showGoogle ? 0.45 : 0.4}>
                     <GlassField
                       label="Email"
                       showLabel={email.length > 0}
@@ -541,7 +542,7 @@ export function AuthComponent({ initialMode = "signin" }: { initialMode?: Mode }
                       <input type="email" name="email" autoComplete="email" inputMode="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={onKeyDown} className={inputClass} />
                     </GlassField>
                   </BlurFade>
-                  <BlurFade delay={showGoogle ? 1 : 0.7} className="mt-6 flex flex-col items-center gap-3">
+                  <BlurFade delay={showGoogle ? 0.6 : 0.55} className="mt-6 flex flex-col items-center gap-3">
                     {!signUp && codesReady && (
                       <button type="button" onClick={() => startCode("login")} className={cn(linkClass, "inline-flex items-center gap-1.5")}>
                         <KeyRound className="size-4" /> Sign in with a code instead

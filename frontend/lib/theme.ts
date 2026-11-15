@@ -64,4 +64,4 @@ export function watchSystemTheme() {
 }
 
 /** Runs before the page paints, so a light-theme user never sees a dark flash. */
-export const THEME_BOOT_SCRIPT = `try{if(localStorage.getItem("${LIVE_BG_KEY}")==="off")document.documentElement.dataset.liveBg="off"}catch(e){}try{var t=localStorage.getItem("${THEME_KEY}");var l=t==="light"||(t==="system"&&matchMedia("(prefers-color-scheme: light)").matches);if(l){document.documentElement.classList.remove("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","${THEME_COLORS.light}")}}catch(e){}`;
+export const THEME_BOOT_SCRIPT = `try{if(navigator.userAgent.indexOf("SynapseApp")>-1)document.documentElement.dataset.app="1"}catch(e){}try{if(localStorage.getItem("${LIVE_BG_KEY}")==="off")document.documentElement.dataset.liveBg="off"}catch(e){}try{var t=localStorage.getItem("${THEME_KEY}");var l=t==="light"||(t==="system"&&matchMedia("(prefers-color-scheme: light)").matches);if(l){document.documentElement.classList.remove("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","${THEME_COLORS.light}")}}catch(e){}`;
